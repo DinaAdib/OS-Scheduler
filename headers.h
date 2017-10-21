@@ -11,16 +11,46 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <signal.h>
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <queue>
+#include <string>
+
+using namespace std; 
+
 
 #define SHKEY 300
 
+//Defining Structs
+
+//Struct for process data in process table block
+struct processBlock {
+    int id;
+    int arrivaltime;
+    int runningtime;
+    int priority;
+    int remainingtime;
+    int starttime;
+    int finishtime;
+    int waittime; //derived from other attributes?
+    string status;
+}processBlock;
+
+//Struct for process data 
+struct processData {
+    int id;
+    int arrivaltime;
+    int runningtime;
+    int priority;
+}processData;
 
 ///==============================
 //don't mess with this variable//
 int* shmaddr;                  //
 //===============================
 
-
+int nProcesses=0; 
 
 int getClk()
 {

@@ -37,7 +37,7 @@ struct processBlock {
     int startTime;
     int finishTime;
     int waitTime; //derived from other attributes?
-    string status;
+    string state;
 }processBlock;
 
 //Struct for process data
@@ -48,6 +48,7 @@ struct processData {
     int priority;
     int remainingTime;
     int criteria;
+    int PID;
 
     processData(){}
     processData(int i , int a,int r , int p)
@@ -91,6 +92,11 @@ int getClk()
     return clk;
 }
 
+int pulse(int &currentClk)
+{	
+	if (getClk()==currentClk) return false;
+	else {currentClk=getClk(); return true;}
+}
 
 /* All process call this function at the begining to establish communication
 between them and the clock module

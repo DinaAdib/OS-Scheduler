@@ -1,37 +1,77 @@
-//
-// Created by rana-afifi on 10/21/17.
-//
 #include "headers.h"
 
+//Global Variables
+priority_queue <struct processData> readyQ;
+queue <struct processData> roundRobinQ;
+vector <struct processBlock> processTable;
+struct processData topProcess, runningProcess;
+
+//run process on top of readyQueue
+void runProcess() {
+    runningProcess = topProcess;
+    if(runningProcess.runningTime == runningProcess.remainingTime) processTable[runningProcess.id-1].state = "started";
+    else processTable[runningProcess.id].state = "resumed";
+}
 
 int main(int argc, char* argv[]) {
-    printf("\n Hey I am scheduler!");
-    //initClk();
-    // initialize ready queue
+    
+    initClk();
+    //assume received from process generator
+    int quantum;
+    //nProcesses;
+    int algorithmChosen;
+
+    //Local Variables
+    bool processFinished = false;
+    int currentClk;
+    int tempPerProcess; //Used in case of round robin
+   struct processData currentProcess;
+
+    //TODO: implement the scheduler :)
+    while(readyQ.size() > 0) {
+        //if received process from process generator insert into queue
+        //write here..
 
 
-    struct processData p1(1,2,3,5);
-    struct processData p2(3,3,2,7);
-    struct processData p5(7,3,2,1);
-    p1.criteria=5;
-    p2.criteria=7;
-    p5.criteria=1;
-    priority_queue <struct processData> readyQ;
-    readyQ.push(p1);
-    readyQ.push(p2);
-    readyQ.push(p5);
-//for testing purposes
-    struct processData p3=readyQ.top();
+        //make topProcess = process at the top of the queue (not necessarily the one currently running in HPF and SRTN)
 
-    printf(" AYWAAAAAAAAAAA %d",p3.criteria);
-    readyQ.pop();
-    p3=readyQ.top();
-    printf(" AYWAAAAAAAAAAA %d",p3.criteria);
+	currentClk=getClk();
+        switch (algorithmChosen)
+       {  case HPF:
+             topProcess = readyQ.top();
+             readyQ.pop();
+            break;
 
-    //receive process data from PG
-    // load data to a priority queue
+        case SRTN:
+              topProcess = readyQ.top();
+              readyQ.pop();
+            break;
+
+        case RoundRobin:
+             topProcess = roundRobinQ.front();
+             roundRobinQ.pop();
+            tempPerProcess = quantum;
+
+            //while process didn't finish executing 
+            while((runningProcess.remainingTime > 0) && tempPerProcess > 0) {
+                if(pulse(currentClk)) {
+                    tempPerProcess--;
+                    (runningProcess.remainingTime)--;
+                }
+            }
+
+            //if running process finished its quantum time, stop it
+            kill(runningProcess.PID, SIGSTOP);
+
+            
+            break;
+
+        default:
+            break;
+   	 }
+	}
 
     //upon termination release clock
-    //destroyClk(true);
-
+    destroyClk(true);
+    
 }

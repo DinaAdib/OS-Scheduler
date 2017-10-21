@@ -16,7 +16,7 @@ int main() {
     int schdID=fork();
     if (schdID==0) //child executes itself 
     {  char* const par[]={(char*)0};
-       execv("./scheduler.out",par);
+       execv("./sch.out",par);
     }
     // 3-use this function after creating clock process to initialize clock
     initClk();

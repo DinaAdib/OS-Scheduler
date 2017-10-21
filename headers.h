@@ -46,6 +46,7 @@ struct processData {
     int arrivalTime;
     int runningTime;
     int priority;
+    int remainingTime;
     int criteria;
 
     processData(){}
@@ -68,6 +69,13 @@ struct processData {
 
 
 }processData;
+
+//Enum for Algorithms' choice
+enum Algorithm {
+	HPF,
+	SRTN,
+	RoundRobin
+};
 
 ///==============================
 //don't mess with this variable//

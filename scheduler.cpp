@@ -5,11 +5,15 @@ priority_queue <struct processData> readyQ;
 queue <struct processData> roundRobinQ;
 vector <struct processBlock> processTable;
 struct processData topProcess, runningProcess;
-
+bool forkRunning = false; //flag set when a process starts to make the scheduler fork a starting process
 //run process on top of readyQueue
 void runProcess() {
+    forkRunning = false;
     runningProcess = topProcess;
-    if(runningProcess.runningTime == runningProcess.remainingTime) processTable[runningProcess.id-1].state = "started";
+    if(runningProcess.runningTime == runningProcess.remainingTime) {
+	    processTable[runningProcess.id-1].state = "started";
+	    forkRunning = true;
+    }
     else processTable[runningProcess.id].state = "resumed";
 }
 
@@ -31,8 +35,7 @@ int main(int argc, char* argv[]) {
     while(readyQ.size() > 0) {
         //if received process from process generator insert into queue
         //write here..
-
-
+	    
         //make topProcess = process at the top of the queue (not necessarily the one currently running in HPF and SRTN)
 
 	currentClk=getClk();

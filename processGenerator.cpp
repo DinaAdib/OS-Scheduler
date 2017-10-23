@@ -46,7 +46,8 @@ int main() {
    
     Load();
     struct processData top=processes.front();
-    printf("\n top priority= %d",top.arrivalTime);
+	//for testing
+    printf("\n top arrival time= %d",top.arrivalTime);
 
 
 
@@ -64,7 +65,7 @@ int main() {
     sprintf(choicePar, "%d", choice);
     sprintf(quantumPar, "%d", quantum);
 
-    //Create scheduler
+    //Create scheduler and send chosen algorithm and quantum for RR 
     int schdID=fork();
     if (schdID==0) //child executes itself
     {
@@ -84,13 +85,16 @@ int main() {
 
     //5-Send the information to  the scheduler at the appropriate time 
     //(only when a process arrives) so that it will be put it in its turn.
+   //cout for testing
     cout << "\nnumber of processes: " <<nProcesses;
+	
+	//while not all processes are sent, stay in while loop (Finishes when all processes arrive)
     while(i < nProcesses-1){
         x=getClk();
   //      cout<< x << "\n";
         if(top.arrivalTime == x) {
-            Send(pGeneratorSendQid, top);//Send message to scheduler containing this process data
-            kill(schdID, SIGUSR1);
+            Send(pGeneratorSendQid, top); //Send message to scheduler containing this process data
+            kill(schdID, SIGUSR1);  //Send signal to scheduler to wake it up to receive arriving process
             processes.pop();
             top=processes.front();
             i++;
@@ -138,7 +142,9 @@ void Load()
 	}
         inp.close();
 }
-printf("Received Successfully ID: %d", message.mProcess.id);
+
+/*------------------Functions---------------*/
+
 //This function is used to send process data to scheduler when current time = arrival time of process
 void Send(key_t pGeneratorSendQid, struct processData processToSend)
 {

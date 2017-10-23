@@ -20,25 +20,30 @@ void Receive(key_t schedulerRcvQid);
 void runProcess();
 
 int main(int argc, char* argv[]) {
-
+	//cout for testing
     cout<< "\n Hello. I am the scheduler!!!" << getpid();
-
+   
    initClk();
 
    schedulerRcvQid= msgget(12614, IPC_CREAT | 0644);
+	
+    //Signals
    signal (SIGUSR1, newProcessHandler);
    signal (SIGCHLD, finishedChildHandler);
 
+	//While loop then run process for testing
    while(readyQ.size() < 10) {
 
       }
    runningProcess = readyQ.top();
    runProcess();
-    //Signals
 
-    //assume received from process generator. Variables received from process generator
-    int quantum;
+    //Variables received from process generator   
+    algorithmChosen = argv[1];	
+    int quantum = argv[2];
     //nProcesses;
+	
+	//for testing variables received
     for(int i=0; i<argc; i++){
         cout<<argv[i] << "  ";
     }

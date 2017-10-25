@@ -6,10 +6,11 @@
 queue <struct processData> processes;
 
 /*----------Functions' headers-----------*/
+void signalChild(int);
 void ClearResources(int);
 void Load();  //Load from input file
 void Send(key_t pGeneratorSendQid, struct processData processToSend);
-int clkID;
+int clkID, schdID;
 
 int main() {
 
@@ -31,7 +32,9 @@ int main() {
 
 
      signal(SIGINT,ClearResources);
-    //TODO: 
+     signal(SIGCHLD,signalChild);
+
+    //TODO:
     // 1-Ask the user about the chosen scheduling Algorithm and its parameters if exists.
      printf("\n Choose the scheduling algorithm: \n 1-Non Pre-emptive HPF \n 2-Pre-emptive SRTN \n 3-Round Robin: \n");
      scanf("%d",&choice);
@@ -43,10 +46,10 @@ int main() {
     // 2-Initiate and create Scheduler and Clock processes.
 
 
-   
+
     Load();
     struct processData top=processes.front();
-	//for testing
+        //for testing
     printf("\n top arrival time= %d",top.arrivalTime);
 
 
@@ -65,34 +68,34 @@ int main() {
     sprintf(choicePar, "%d", choice);
     sprintf(quantumPar, "%d", quantum);
 
-    //Create scheduler and send chosen algorithm and quantum for RR 
-    int schdID=fork();
+    //Create scheduler and send chosen algorithm and quantum for RR
+    schdID=fork();
     if (schdID==0) //child executes itself
     {
         char *schPar[] = { "./sch.out",choicePar, quantumPar, 0 };
         execve(schPar[0], &schPar[0], NULL);
     }
-
     // 3-use this function after creating clock process to initialize clock
 
 
 
     /////Toget time use the following function
-   int x= getClk();
-    printf("current time is %d\n",x);
+   int currentT= getClk();
+    printf("current time is %d\n",currentT);
     //TODO:  Generation Main Loop
      //4-Creating a data structure for process  and  provide it with its parameters
 
-    //5-Send the information to  the scheduler at the appropriate time 
+    //5-Send the information to  the scheduler at the appropriate time
     //(only when a process arrives) so that it will be put it in its turn.
    //cout for testing
-    cout << "\nnumber of processes: " <<nProcesses;
-	
-	//while not all processes are sent, stay in while loop (Finishes when all processes arrive)
-    while(i < nProcesses-1){
-        x=getClk();
-  //      cout<< x << "\n";
-        if(top.arrivalTime == x) {
+    cout << "\n number of processes: " <<nProcesses;
+
+        //while not all processes are sent, stay in while loop (Finishes when all processes arrive)
+    while(i <= nProcesses){
+        currentT=getClk();
+
+        if(top.arrivalTime == currentT) {
+            printf("\n  sending process %d \n ",i);
             Send(pGeneratorSendQid, top); //Send message to scheduler containing this process data
             kill(schdID, SIGUSR1);  //Send signal to scheduler to wake it up to receive arriving process
             processes.pop();
@@ -102,6 +105,20 @@ int main() {
     }
     while(1){}
 
+}
+
+
+void signalChild(int signum)
+{
+    int pid , stat_loc;
+    printf("\n Received signal %d from child", signum );
+    pid=wait(&stat_loc);
+    printf("\n pid= %d",pid);
+    if(!(stat_loc& 0x00FF))
+        printf("\n Scheduler terminated with exit code %d\n", stat_loc>>8);
+    else {printf("\n Rana hatetganen\n");}
+
+    return;
 }
 
 void ClearResources(int)
@@ -122,10 +139,10 @@ void Load()
         //Load processes info
          struct processData p;
 
-        while (!inp.eof())
-	{
-            inp.getline(Data,500); 
-            printf("\nData= %s", Data);
+        while( inp.getline(Data,500))
+        {
+
+            printf("\nData= %s \n ", Data);
             if(Data[0]!='#') {
                 stringstream ss(Data); //using stringstream to split string to int
                 while(ss.good()){
@@ -139,8 +156,9 @@ void Load()
                 processes.push(p); // insert to queue
                 nProcesses++;
             }
-	}
+        }
         inp.close();
+        return;
 }
 
 /*------------------Functions---------------*/
@@ -152,12 +170,12 @@ void Send(key_t pGeneratorSendQid, struct processData processToSend)
   struct processMsgBuff message;
   message.mProcess = processToSend;
   message.mtype = 7;
- cout << "\nProcess to be sent: ID = " << message.mProcess.id;
+ cout << "\nProcess to be sent: ID = \n " << message.mProcess.id;
   send_val = msgsnd(pGeneratorSendQid, &message, sizeof(message.mProcess), !IPC_NOWAIT);
 
   if(send_val == -1)
-        perror("Error in send");
-  else printf("Process sent successfully");
+        perror("Error in send \n ");
+  else printf("\n Process sent successfully \n ");
 
 }
 

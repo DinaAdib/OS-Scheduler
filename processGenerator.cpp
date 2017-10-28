@@ -1,6 +1,4 @@
 #include "headers.h"
-//FOR MICHAEL:
-//Important Note: DON'T FORGET to clean the message queue using command (ipcrm -Q 12614)
 
 // Global Variables
 queue <struct processData> processes;
@@ -16,9 +14,9 @@ int main() {
 
     /*-----------Local Variables--------*/
     int i = 0; //index incremented when current time = arrival time of a process to index next upcoming process
-    int choice, quantum;
-    char choicePar[2];
-    char quantumPar[2];
+    int choice;
+    int quantum;
+     string choiceStr, quantumStr, nProcessesStr;
 
     key_t pGeneratorSendQid;
 
@@ -38,11 +36,12 @@ int main() {
     // 1-Ask the user about the chosen scheduling Algorithm and its parameters if exists.
      printf("\n Choose the scheduling algorithm: \n 1-Non Pre-emptive HPF \n 2-Pre-emptive SRTN \n 3-Round Robin: \n");
      scanf("%d",&choice);
-
-     if(choice == 3) {
-         printf("\n Please enter quantum value: ");
+    choice--;
+     if(choice == 2) {
+         printf("\n Please enter quantum value: \n");
           scanf("%d",&quantum);
      }
+     else quantum = 0;
     // 2-Initiate and create Scheduler and Clock processes.
 
 
@@ -59,21 +58,21 @@ int main() {
     if (clkID==0) //child executes itself
     {
         cout<<"starting";
-        char *clkPar[] = {"./clk.out", 0 };
-        execve(clkPar[0], &clkPar[0], NULL);
+                char*const clkPar[] = { 0 };
+                execv("./clk.out", clkPar);
     }
 
     initClk();
-    //convert user inputs
-    sprintf(choicePar, "%d", choice);
-    sprintf(quantumPar, "%d", quantum);
 
     //Create scheduler and send chosen algorithm and quantum for RR
     schdID=fork();
     if (schdID==0) //child executes itself
     {
-        char *schPar[] = { "./sch.out",choicePar, quantumPar, 0 };
-        execve(schPar[0], &schPar[0], NULL);
+        quantumStr = to_string(quantum);
+       choiceStr = to_string(choice);
+       nProcessesStr = to_string(nProcesses);
+       char*const schPar[] = {(char*)choiceStr.c_str(), (char*)quantumStr.c_str(), (char*)nProcessesStr.c_str(), 0 };
+       execv("./sch.out",schPar);
     }
     // 3-use this function after creating clock process to initialize clock
 
@@ -178,6 +177,4 @@ void Send(key_t pGeneratorSendQid, struct processData processToSend)
   else printf("\n Process sent successfully \n ");
 
 }
-
-
 

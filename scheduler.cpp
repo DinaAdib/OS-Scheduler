@@ -38,11 +38,11 @@ int main(int argc, char* argv[]) {
    signal (SIGUSR1, newProcessHandler);
    signal (SIGINT, finishedChildHandler);
 
-   while(readyQ.size() < 10) {}
+  while(readyQ.size() < 3) {}
  cout<< "Ready Queue Size = \n " << readyQ.size();
-  // runningProcess = readyQ.top();
+  runningProcess = readyQ.top();
  runProcess();
-
+while(1){}
     //Variables received from process generator
     int quantum;
 

@@ -12,9 +12,9 @@ vector <struct processBlock> processTable;
 struct processData topProcess, runningProcess;
 int algorithmChosen=1;
 key_t schedulerRcvQid;
-int schID;
-char schIDPar[2];
-char remainingTimePar[2];
+string remainingTimeStr;
+string choice, quantum;
+//const char* nProcessesStr;
 
 /*---------Functions' Headers-----*/
 void Receive(key_t schedulerRcvQid);
@@ -22,8 +22,20 @@ void runProcess();
 
 int main(int argc, char* argv[]) {
 
-    cout<< "\n Hello. I am the scheduler!!! \n" << getpid();
-    schID = getpid();
+cout<< "count of arg: "<< argc <<endl;
+    choice ="1";
+    cout<< "arg 1: "<< argv[0]<<endl;
+    cout<< "arg 2: "<< argv[1]<<endl;
+     cout<< "arg 3: "<< argv[2]<<endl;
+  /*
+    quantum = argv[2];
+   // nProcessesStr = argv[2];
+    nProcesses = atoi(argv[3]);
+    printf("\n nProcesses = %d \n", nProcesses);
+    cout<< "nProcesses = "<< nProcesses <<endl;
+     cout<< "\n Hello. I am the scheduler!!! my algorithm= " << choice <<endl;
+      cout<< "\n Hello. I am the scheduler!!! my quantum= " << quantum <<endl;
+       cout<< "\n Hello. I am the scheduler!!! my nProcesses= " << nProcesses <<endl;*/
    initClk();
 
    //Create queue for scheduler to receive messages
@@ -40,11 +52,15 @@ int main(int argc, char* argv[]) {
 
   while(readyQ.size() < 3) {}
  cout<< "Ready Queue Size = \n " << readyQ.size();
-  runningProcess = readyQ.top();
+ runningProcess.arrivalTime= 7;
+ runningProcess.remainingTime= 7;
+ runningProcess.runningTime= 7;
+ runningProcess.priority= 1;
+  readyQ.push(runningProcess);
  runProcess();
 while(1){}
     //Variables received from process generator
-    int quantum;
+
 
     //Local Variables
     struct processData runningProcess;
@@ -138,11 +154,13 @@ void runProcess() {
         runningProcess.PID= fork();
 
         if(runningProcess.PID==0){
-            printf("\n I am the child. my process number = %d \n ", runningProcess.id);
-            sprintf(remainingTimePar, "%d", runningProcess.remainingTime);
-            sprintf(schIDPar, "%d", schID);
-            char *processPar[] = { "./process.out",remainingTimePar, schIDPar, 0};
-            execve(processPar[0], &processPar[0], NULL);
+            remainingTimeStr = to_string(runningProcess.remainingTime);
+
+           printf("\n I am the child. my process number = %d, remaining time= %d, converted= \n ", runningProcess.id, runningProcess.remainingTime);
+           cout << remainingTimeStr <<endl;
+
+           char*const processPar[] = {(char*)remainingTimeStr.c_str(), 0};
+           execv("./process.out", processPar);
         }
     }
     else {
@@ -165,11 +183,10 @@ void Receive(key_t schedulerRcvQid)
 
       else {
           //insert process data into ready queue
-            if(algorithmChosen == RoundRobin) roundRobinQ.push(message.mProcess);
-            else readyQ.push(message.mProcess);}
-      printf("\n Received Successfully ID: %d, readyQ size: %d \n", message.mProcess.id, readyQ.size());
-
-
+          if(!choice.compare("2")) roundRobinQ.push(message.mProcess);
+          else   readyQ.push(message.mProcess);
+               cout<<"\n Received Successfully ID: "<< message.mProcess.id<<"readyQ size:  \n" << readyQ.size() <<endl;
+        }
 }
 
 

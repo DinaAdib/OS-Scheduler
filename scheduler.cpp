@@ -1,5 +1,5 @@
 #include "headers.h"
-#include <errno.h>
+
 
 //Signals' Handlers
 void newProcessHandler(int signum);
@@ -14,6 +14,7 @@ int algorithmChosen=1;
 key_t schedulerRcvQid;
 string remainingTimeStr;
 string choice, quantum;
+//int number;
 //const char* nProcessesStr;
 
 /*---------Functions' Headers-----*/
@@ -23,19 +24,41 @@ void runProcess();
 int main(int argc, char* argv[]) {
 
 cout<< "count of arg: "<< argc <<endl;
-    choice ="1";
+    choice =argv[0];
     cout<< "arg 1: "<< argv[0]<<endl;
     cout<< "arg 2: "<< argv[1]<<endl;
      cout<< "arg 3: "<< argv[2]<<endl;
+   // nProcessesStr = argv[2];
+   // int x;
+     string s=argv[2];
+     int number = 0;
+        int neg = s[0] == '-';
+        int i = neg ? 1 : 0;
+        while ( s[i] >= '0' && s[i] <= '9' )
+        {
+          number *= 10;             // multiply number by 10
+          number += s[i] - '0'; // convet ASCII '0'..'9' to digit 0..9 and add it to number
+          i ++;                     // step one digit forward
+        }
+        if ( neg )
+           number *= -1;
+
+
+
+        printf( "\n  number %d", number );
+  //int number=stoi(s);
+
+//for( x=0 ; x<(unsigned char)*nProcessesStr-'0'<10;nProcessesStr++)
+  //1   x=10*x+(*nProcessesStr-'0');
   /*
     quantum = argv[2];
    // nProcessesStr = argv[2];
-    nProcesses = atoi(argv[3]);
     printf("\n nProcesses = %d \n", nProcesses);
     cout<< "nProcesses = "<< nProcesses <<endl;
      cout<< "\n Hello. I am the scheduler!!! my algorithm= " << choice <<endl;
-      cout<< "\n Hello. I am the scheduler!!! my quantum= " << quantum <<endl;
-       cout<< "\n Hello. I am the scheduler!!! my nProcesses= " << nProcesses <<endl;*/
+      cout<< "\n Hello. I am the scheduler!!! my quantum= " << quantum <<endl;*/
+      // printf("\n Hello. I am the scheduler!!! my nProcesses= %d" , number);
+    //   printf("\n Hello. I am the scheduler!!! my x= %d" , x);
    initClk();
 
    //Create queue for scheduler to receive messages
@@ -50,13 +73,14 @@ cout<< "count of arg: "<< argc <<endl;
    signal (SIGUSR1, newProcessHandler);
    signal (SIGINT, finishedChildHandler);
 
-  while(readyQ.size() < 3) {}
+  while(readyQ.size() < number && roundRobinQ.size()<number) {}
  cout<< "Ready Queue Size = \n " << readyQ.size();
  runningProcess.arrivalTime= 7;
  runningProcess.remainingTime= 7;
  runningProcess.runningTime= 7;
  runningProcess.priority= 1;
   readyQ.push(runningProcess);
+  roundRobinQ.push(runningProcess);
  runProcess();
 while(1){}
     //Variables received from process generator
@@ -178,8 +202,7 @@ void Receive(key_t schedulerRcvQid)
       rec_val = msgrcv(schedulerRcvQid, &message, sizeof(message.mProcess), 0, !IPC_NOWAIT);
     printf("\n Received Successfully ID: %d \n", message.mProcess.id);
       if(rec_val == -1)
-            {cout<< "\n  error no"<<errno;
-            perror("\n  fail");}
+            {perror("\n  fail");}
 
       else {
           //insert process data into ready queue

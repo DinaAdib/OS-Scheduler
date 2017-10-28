@@ -2,3 +2,4 @@
 1	3	16	8
 2	9	23	6
 3	9	12	10
+#Don't forget to update while loop with no of processes 

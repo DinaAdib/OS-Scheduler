@@ -1,0 +1,7 @@
+#id arrival runtime priority
+1	2	3	6
+2	2	5	9
+3   4   2   10
+4   10  5   3
+5   13  5   3
+#Don't forget to update while loop with no of processes

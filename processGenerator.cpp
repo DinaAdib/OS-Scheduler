@@ -51,6 +51,16 @@ int main()
 
     Load();
     struct processData top=processes.front();
+        //Create scheduler and send chosen algorithm and quantum for RR
+    schdID=fork();
+    if (schdID==0) //child executes itself
+    {
+        quantumStr = to_string(quantum);
+        choiceStr = to_string(choice);
+        nProcessesStr = to_string(nProcesses);
+        char*const schPar[] = {(char*)choiceStr.c_str(), (char*)quantumStr.c_str(), (char*)nProcessesStr.c_str(), 0 };
+        execv("./sch.out",schPar);
+    }
     //for testing
     printf("\n top arrival time= %d",top.arrivalTime);
 
@@ -67,16 +77,7 @@ int main()
 
     initClk();
 
-    //Create scheduler and send chosen algorithm and quantum for RR
-    schdID=fork();
-    if (schdID==0) //child executes itself
-    {
-        quantumStr = to_string(quantum);
-        choiceStr = to_string(choice);
-        nProcessesStr = to_string(nProcesses);
-        char*const schPar[] = {(char*)choiceStr.c_str(), (char*)quantumStr.c_str(), (char*)nProcessesStr.c_str(), 0 };
-        execv("./sch.out",schPar);
-    }
+
     // 3-use this function after creating clock process to initialize clock
 
 
@@ -192,7 +193,7 @@ void Send(key_t pGeneratorSendQid, struct processData processToSend)
     int send_val;
     struct processMsgBuff message;
     message.mProcess = processToSend;
-    message.mtype = 7;
+    message.mtype = processToSend.arrivalTime;
     cout << "\nProcess to be sent: ID = \n " << message.mProcess.id;
     send_val = msgsnd(pGeneratorSendQid, &message, sizeof(message.mProcess), !IPC_NOWAIT);
 
@@ -201,4 +202,3 @@ void Send(key_t pGeneratorSendQid, struct processData processToSend)
     else printf("\n Process sent successfully \n ");
 
 }
-

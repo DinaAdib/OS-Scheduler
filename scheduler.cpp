@@ -31,7 +31,9 @@ void setMaskedList();
 void releaseBlockedSignals();
 
 int main(int argc, char* argv[])
-{
+{  //Signals
+    signal (SIGUSR1, newProcessHandler);
+    signal (SIGCHLD, finishedChildHandler);
 
     cout<< "count of arg: "<< argc <<endl;
 
@@ -56,9 +58,7 @@ int main(int argc, char* argv[])
         perror(" \n Error in creating process receiving queue in scheduler");
         exit(-1);
     }
-    //Signals
-    signal (SIGUSR1, newProcessHandler);
-    signal (SIGCHLD, finishedChildHandler);
+
 
 // while(readyQ.size() < noProcesses && roundRobinQ.size()<noProcesses) {}
     while(roundRobinQ.size() <1 && readyQ.size() < 1) {}  // wait for the first process ---> WILL BE CHANGED
@@ -146,21 +146,30 @@ void Receive(key_t schedulerRcvQid)
 {
     int rec_val;
     struct processMsgBuff message;
-    /* receive all types of messages */
-    rec_val = msgrcv(schedulerRcvQid, &message, sizeof(message.mProcess), 0, !IPC_NOWAIT);
-    printf("\n Received Successfully ID: %d  at time %d \n", message.mProcess.id ,getClk());
-    if(rec_val == -1)
-    {
-        perror("\n  fail");
-    }
+    rec_val = 0;
+    int rc;
+  struct msqid_ds buf;
+  int num_messages;
 
-    else
-    {   cout<<"\n Pushing Process of ID"<<message.mProcess.id<<" at time: "<<getClk()<<endl;
-        //insert process data into ready queue
-        if(choice == 2){
-         roundRobinQ.push(message.mProcess); }
-        else   readyQ.push(message.mProcess);
-        cout<<"\n Received Successfully ID: "<< message.mProcess.id<<"readyQ size:  \n" << readyQ.size() <<endl;
+  rc = msgctl(schedulerRcvQid, IPC_STAT, &buf);
+  num_messages = buf.msg_qnum;
+    /* receive all types of messages */
+    for(int j=0;j<num_messages; j++) {
+        rec_val = msgrcv(schedulerRcvQid, &message, sizeof(message.mProcess), 0, !IPC_NOWAIT);
+        printf("\n Received Successfully ID: %d  at time %d \n", message.mProcess.id ,getClk());
+        if(rec_val == -1)
+        {
+            perror("\n  fail");
+        }
+
+        else
+        {   cout<<"\n Pushing Process of ID"<<message.mProcess.id<<" at time: "<<getClk()<<endl;
+            //insert process data into ready queue
+            if(choice == 2){
+             roundRobinQ.push(message.mProcess); }
+            else   readyQ.push(message.mProcess);
+            cout<<"\n Received Successfully ID: "<< message.mProcess.id<<"readyQ size:  \n" << readyQ.size() <<endl;
+        }
     }
 }
 
@@ -207,7 +216,7 @@ void HPFAlgorithm()
             setMaskedList();
             runProcess();
             sleep(sleepingTime);
-            printf("\n I am awake now \n");
+            printf("\n I am awake now at time %d\n",getClk());
             releaseBlockedSignals();
 
         }

@@ -20,18 +20,23 @@ int sleepingTime = 0;
 int startTime;
 int endTime;
 sigset_t set;
+int rc;
+struct msqid_ds buf;
+int num_messages;
 
 /*---------Functions' Headers-----*/
 void Receive(key_t schedulerRcvQid);
 void runProcess();
 void HPFAlgorithm();
+void SRTNAlgorithm();
 void RRAlgorithm();
 void printSignalSet(sigset_t *set);
 void setMaskedList();
 void releaseBlockedSignals();
 
 int main(int argc, char* argv[])
-{  //Signals
+{
+    //Signals
     signal (SIGUSR1, newProcessHandler);
     signal (SIGCHLD, finishedChildHandler);
 
@@ -78,6 +83,12 @@ int main(int argc, char* argv[])
 
     case SRTN:
 
+        cout<< "\n In SRTN" <<endl;
+        startTime=getClk();
+        SRTNAlgorithm();
+        endTime=getClk();
+
+        printf("\n Total Running Time %d \n",endTime-startTime);
         break;
 
     case RoundRobin:
@@ -147,14 +158,13 @@ void Receive(key_t schedulerRcvQid)
     int rec_val;
     struct processMsgBuff message;
     rec_val = 0;
-    int rc;
-  struct msqid_ds buf;
-  int num_messages;
 
-  rc = msgctl(schedulerRcvQid, IPC_STAT, &buf);
-  num_messages = buf.msg_qnum;
+
+    rc = msgctl(schedulerRcvQid, IPC_STAT, &buf);
+    num_messages = buf.msg_qnum;
     /* receive all types of messages */
-    for(int j=0;j<num_messages; j++) {
+    for(int j=0; j<num_messages; j++)
+    {
         rec_val = msgrcv(schedulerRcvQid, &message, sizeof(message.mProcess), 0, !IPC_NOWAIT);
         printf("\n Received Successfully ID: %d  at time %d \n", message.mProcess.id ,getClk());
         if(rec_val == -1)
@@ -163,10 +173,13 @@ void Receive(key_t schedulerRcvQid)
         }
 
         else
-        {   cout<<"\n Pushing Process of ID"<<message.mProcess.id<<" at time: "<<getClk()<<endl;
+        {
+            cout<<"\n Pushing Process of ID"<<message.mProcess.id<<" at time: "<<getClk()<<endl;
             //insert process data into ready queue
-            if(choice == 2){
-             roundRobinQ.push(message.mProcess); }
+            if(choice == 2)
+            {
+                roundRobinQ.push(message.mProcess);
+            }
             else   readyQ.push(message.mProcess);
             cout<<"\n Received Successfully ID: "<< message.mProcess.id<<"readyQ size:  \n" << readyQ.size() <<endl;
         }
@@ -204,6 +217,7 @@ void finishedChildHandler(int signum)
 
 /*----------Functions-----------*/
 
+//HPF Algorithm
 void HPFAlgorithm()
 {
     while(noFinished < noProcesses)
@@ -225,6 +239,28 @@ void HPFAlgorithm()
 
 }
 
+//SRTN Algorithm
+void SRTNAlgorithm()
+{
+    while(noFinished < noProcesses)
+    {
+        if(!readyQ.empty())
+        {
+            runningProcess = readyQ.top();
+            readyQ.pop();
+            runProcess();
+            int tBeforeSleeping=getClk();
+                pause();
+                kill(runningProcess.PID, SIGUSR2);
+                int tAfterSleeping=getClk();
+                int slept=tAfterSleeping-tBeforeSleeping;
+                runningProcess.remainingTime-=slept;
+                printf("\n I am awake now at time %d\n",getClk());
+                readyQ.push(runningProcess);
+        }  // End whilele
+    }
+}
+//Round Robin Algorithm
 void RRAlgorithm()
 {
     while(noFinished < noProcesses)
@@ -249,7 +285,7 @@ void RRAlgorithm()
                 roundRobinQ.push(runningProcess);
                 // update process block
 
-                 // pause signal
+                // pause signal
 
                 // meen yt3mlo push elawl?
             }
@@ -274,10 +310,10 @@ void printSignalSet(sigset_t *set)
 {
     /* This listing of signals may be incomplete. */
     const int sigList[] = {  SIGINT, SIGKILL,  SIGUSR1,
-                            SIGUSR2, SIGCHLD, SIGCONT, SIGSTOP
+                             SIGUSR2, SIGCHLD, SIGCONT, SIGSTOP
                           };
     const char *sigNames[] = {  "SIGINT","SIGKILL", "SIGUSR1",
-                               "SIGUSR2", "SIGCHLD", "SIGCONT", "SIGSTOP"
+                                "SIGUSR2", "SIGCHLD", "SIGCONT", "SIGSTOP"
                              };
     const int sigLen = 7;
 
@@ -338,7 +374,7 @@ void setMaskedList()
         exit(EXIT_FAILURE);
     }
     /* Now, SIGINT will be "blocked". */
-  //  printf("--- NEW signal mask for this process: ---\n");
-  //  printSignalSet(&set);
+    //  printf("--- NEW signal mask for this process: ---\n");
+    //  printSignalSet(&set);
 
 }

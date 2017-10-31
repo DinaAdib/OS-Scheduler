@@ -16,7 +16,7 @@ void cleanup(int x)
 
 /* this file represents the system clock for ease of calculations*/
 int main() {
-  printf("Clock Starting\n");
+  printf("Clock Starting with id %d\n",getpid());
   signal(SIGINT,cleanup);
   int clk=0;
 
@@ -30,12 +30,12 @@ int main() {
 
  int * shmaddr = (int*) shmat(shmid, (void *)0, 0);
   if((long)shmaddr == -1)
-  {	
+  {
   	perror("Error in attach in parent");
   	exit(-1);
   }
   else
-  {	
+  {
    	*shmaddr = clk;		/* initialize shared memory */
   }
    while(1)

@@ -1,5 +1,5 @@
 #include "headers.h"
-#include <errno.h>
+
 
 //Signals' Handlers
 void newProcessHandler(int signum);
@@ -10,176 +10,383 @@ priority_queue <struct processData> readyQ;
 queue <struct processData> roundRobinQ;
 vector <struct processBlock> processTable;
 struct processData topProcess, runningProcess;
-int algorithmChosen;
-//Create queue for scheduler to receive messages
 key_t schedulerRcvQid;
-
+string remainingTimeStr;
+int choice= 0;
+int quantum = 0;
+int noProcesses = 0;
+int noFinished = 0;
+int sleepingTime = 0;
+int startTime;
+int endTime;
+sigset_t set;
+int rc;
+struct msqid_ds buf;
+int num_messages;
+bool runningPFinished = false;
 
 /*---------Functions' Headers-----*/
 void Receive(key_t schedulerRcvQid);
 void runProcess();
+void HPF_Algorithm();
+void SRTN_Algorithm();
+void RR_Algorithm();
+void printSignalSet(sigset_t *set);
+void setMaskedList();
+void releaseBlockedSignals();
 
-int main(int argc, char* argv[]) {
-	//cout for testing
-    cout<< "\n Hello. I am the scheduler!!!" << getpid();
-   
-   initClk();
-
-   schedulerRcvQid= msgget(12614, IPC_CREAT | 0644);
-	
+int main(int argc, char* argv[])
+{
     //Signals
-   signal (SIGUSR1, newProcessHandler);
-   signal (SIGCHLD, finishedChildHandler);
+    signal (SIGUSR1, newProcessHandler);
+    signal (SIGCHLD, finishedChildHandler);
 
-	//While loop then run process for testing
-   while(readyQ.size() < 10) {
+    cout<< "count of arg: "<< argc <<endl;
 
-      }
-   runningProcess = readyQ.top();
-   runProcess();
+    cout<< "arg 1: "<< argv[0]<<endl;
+    cout<< "arg 2: "<< argv[1]<<endl;
+    cout<< "arg 3: "<< argv[2]<<endl;
 
-    //Variables received from process generator   
-    algorithmChosen = argv[1];	
-    int quantum = argv[2];
-    //nProcesses;
-	
-	//for testing variables received
-    for(int i=0; i<argc; i++){
-        cout<<argv[i] << "  ";
-    }
-    //Local Variables
-  /*  bool processFinished = false;
-    int currentClk;
-    int tempPerProcess; //Used in case of round robin
-    struct processData runningProcess;
+    choice = atoi(argv[0]);
+    quantum = atoi(argv[1]);
+    noProcesses = atoi(argv[2]);
 
 
+    printf( "\n  number of processes: %d", noProcesses );
+
+    initClk();
+
+    //Create queue for scheduler to receive messages
+    schedulerRcvQid= msgget(12614, IPC_CREAT | 0644);
 
     if(schedulerRcvQid == -1)
     {
-    perror("Error in creating process receiving queue in scheduler");
-    exit(-1);
+        perror(" \n Error in creating process receiving queue in scheduler");
+        exit(-1);
     }
 
-    Receive(schedulerRcvQid);
 
-    //TODO: implement the scheduler :)
-   while(readyQ.size() > 0) {
-        //if received process from process generator insert into queue
-        //write here..
+// while(readyQ.size() < noProcesses && roundRobinQ.size()<noProcesses) {}
+    while(roundRobinQ.size() <1 && readyQ.size() < 1) {}  // wait for the first process ---> WILL BE CHANGED
+    cout<< "RRQ Queue Size = \n " << roundRobinQ.size();
 
+    switch (choice)
+    {
+    case HPF:
+        cout<< "\n In HPF" <<endl;
+        startTime=getClk();
+        HPF_Algorithm();
+        endTime=getClk();
 
-	currentClk=getClk();
-        switch (algorithmChosen)
-        {
-           case HPF:
-            //make topProcess = process at the top of the queue (not necessarily the one currently running in HPF and SRTN)
-             topProcess = readyQ.top();
-             readyQ.pop();
-            break;
+        printf("\n Total Running Time %d \n",endTime-startTime);
 
-            case SRTN:
-              runningProcess=readyQ.top();
-              while(nFinished!=nProcesses){
-                    runProcess();
-                    int start= getclk();
-                    sleep();
-                    int wake = getclk();
-                    runningProcess.remainingTime = runningProcess.remainingTime - (start-wake);
+        break;
 
-                    if(runningProcess.remainingTime==0) {
-                     //delete process
-                    }
-                    else { if(runningProcess.remainingTime > (readyQ.top()).remainingTime) {
-                    //context switching
+    case SRTN:
 
-                    }
-                }
-            break;
+        cout<< "\n In SRTN" <<endl;
+        startTime=getClk();
+        SRTN_Algorithm();
+        endTime=getClk();
 
-            case RoundRobin:
-                 topProcess = roundRobinQ.front();
-                 roundRobinQ.pop();
-                tempPerProcess = quantum;
+        printf("\n Total Running Time %d \n",endTime-startTime);
+        break;
 
-            //while process didn't finish executing
-            while((runningProcess.remainingTime > 0) && tempPerProcess > 0) {
-                if(pulse(currentClk)) {
-                    tempPerProcess--;
-                    (runningProcess.remainingTime)--;
-                    Receive(schedulerRcvQid);
-                }
-             }
+    case RoundRobin:
 
-            //if running process finished its quantum time, stop it
-               kill(runningProcess.PID, SIGSTOP);
+        cout<< "\n In Round Robin" <<endl;
+        startTime=getClk();
+        RR_Algorithm();
+        endTime=getClk();
 
+        printf("\n Total Running Time %d \n",endTime-startTime);
+        break;
 
-            break;
-
-            default:
-                break;
-   	 }
+    default:
+        break;
     }
-    */
+
     //upon termination release clock
-  //  destroyClk(true);
+
+    printf("\n Scheduler Terminating \n");
+
+    destroyClk(true);
+
+    exit(1);
 }
 
 /*--------------------Functions-----------------*/
-char remainingTimePar[2];
-//This function is used to run process on top of readyQueue
-void runProcess() {
-    //runningProcess = topProcess;
-    printf("In the run process");
-    if(runningProcess.runningTime == runningProcess.remainingTime) {
 
-        processTable[runningProcess.id-1].state = "started";
+//This function is used to run process on top of readyQueue
+void runProcess()
+{
+    runningPFinished = false;
+    //runningProcess = topProcess;
+    printf("\n In the run process");
+    if(runningProcess.runningTime == runningProcess.remainingTime)
+    {
+        struct processBlock pB;
+        pB.arrivalTime=runningProcess.arrivalTime;
+        pB.remainingTime=runningProcess.remainingTime;
+        pB.runningTime=runningProcess.runningTime;
+        pB.priority=runningProcess.priority;
+        pB.startTime=getClk();
+        pB.state="started";
+        processTable.push_back(pB);
         runningProcess.PID= fork();
 
-        if(runningProcess.PID==0){
-            printf("I am the child. my process number = %d", runningProcess.id);
-            sprintf(remainingTimePar, "%d", runningProcess.remainingTime);
-            char *processPar[] = { "./process.out",remainingTimePar, 0 };
-            execve(processPar[0], &processPar[0], NULL);
+        if(runningProcess.PID==0)
+        {
+            remainingTimeStr = to_string(runningProcess.remainingTime);
+
+            printf("\n I am the child. my process number = %d, remaining time= %d, criteria = %d\n ", runningProcess.id, runningProcess.remainingTime, runningProcess.criteria);
+            cout << remainingTimeStr <<endl;
+
+            char*const processPar[] = {(char*)remainingTimeStr.c_str(), 0};
+            execv("./process.out", processPar);
         }
     }
-    else processTable[runningProcess.id-1].state = "resumed";
+    else
+    {
+        cout<< "Process running time = "<<runningProcess.runningTime << "is not equal to its remaining time ="<< runningProcess.remainingTime<<endl;
+        processTable[runningProcess.id-1].state = "resumed";
+        kill(runningProcess.PID, SIGCONT); //Send signal to process to continue running
+
+    }
 }
 
 //This function is used to receive processes from process generator
 void Receive(key_t schedulerRcvQid)
 {
-  int rec_val;
-  struct processMsgBuff message;
-    cout<< nProcesses;
-  /* receive all types of messages */
+    int rec_val;
+    struct processMsgBuff message;
+    rec_val = 0;
 
-      rec_val = msgrcv(schedulerRcvQid, &message, sizeof(message.mProcess), 0, !IPC_NOWAIT);
-    printf("Received Successfully ID: %d", message.mProcess.id);
-      if(rec_val == -1)
-            {cout<< "\n error no"<<errno;
-            perror("/n fail");}
 
-      else {
-          printf("Received Successfully ID: %d, readyQ size: %d", message.mProcess.id, readyQ.size());
-          //insert process data into ready queue
-            if(algorithmChosen == RoundRobin) roundRobinQ.push(message.mProcess);
-            else readyQ.push(message.mProcess);}
+    rc = msgctl(schedulerRcvQid, IPC_STAT, &buf);
+    num_messages = buf.msg_qnum;
+    /* receive all types of messages */
+    for(int j=0; j<num_messages; j++)
+    {
+        rec_val = msgrcv(schedulerRcvQid, &message, sizeof(message.mProcess), 0, !IPC_NOWAIT);
+        printf("\n Received Successfully ID: %d  at time %d \n", message.mProcess.id ,getClk());
+        if(rec_val == -1)
+        {
+            perror("\n  fail");
+        }
 
+        else
+        {
+            cout<<"\n Pushing Process of ID"<<message.mProcess.id<<" at time: "<<getClk()<<endl;
+            //insert process data into ready queue
+            if(choice == 2)
+            {
+                roundRobinQ.push(message.mProcess);
+            }
+            else   readyQ.push(message.mProcess);
+            cout<<"\n Received Successfully ID: "<< message.mProcess.id<<"readyQ size:  \n" << readyQ.size() <<endl;
+        }
+    }
 }
 
 
 /*------------Signals' Handlers--------------*/
 void newProcessHandler(int signum)
 {
-    cout<<"\nIn the handler!!!!\n";
+    cout<<"\nIn the new process handler!!\n";
     Receive(schedulerRcvQid);
 
 }
 
 void finishedChildHandler(int signum)
 {
+    int pid , stat_loc;
+    printf("\n SCHEDULER: Received signal %d from child", signum );
+    pid=wait(&stat_loc);
+    printf("\n pid= %d",pid);
+    if(pid==runningProcess.PID&&!(stat_loc& 0x00FF))
+    {
+        printf("\n SCHEDULER: Child Process no %d terminated at time %d with exit code %d\n", runningProcess.PID, getClk(), stat_loc>>8);
+        noFinished++;
+        printf("\n noFinished: %d ",noFinished);
+        runningPFinished = true;
+    }
+    else
+    {
+        printf("\n Child process has been paused or continued %d\n",pid);
+    }
 
+    return;
+}
+
+/*----------Functions-----------*/
+
+//HPF Algorithm
+void HPF_Algorithm()
+{
+    while(noFinished < noProcesses)
+    {
+        if(!readyQ.empty())
+        {
+            runningProcess = readyQ.top();
+            readyQ.pop();
+            sleepingTime = runningProcess.remainingTime+1;
+            setMaskedList();
+            runProcess();
+            sleep(sleepingTime);
+            printf("\n I am awake now at time %d\n",getClk());
+            releaseBlockedSignals();
+
+        }
+
+    }  // End while
+
+}
+
+//SRTN Algorithm
+void SRTN_Algorithm()
+{
+    while(noFinished < noProcesses)
+    {
+        if(!readyQ.empty())
+        {
+            runningProcess = readyQ.top();
+            printf("\n I am the top process, my id= %d and readyQ size = %d\n",runningProcess.id, readyQ.size());
+            readyQ.pop();
+            runProcess();
+            int tBeforeSleeping=getClk();
+            pause();
+            kill(runningProcess.PID, SIGUSR2);
+            int tAfterSleeping=getClk();
+            int slept=tAfterSleeping-tBeforeSleeping;
+            runningProcess.remainingTime-=slept;
+            runningProcess.criteria-=slept;
+
+            printf("\n I am awake now at time %d I slept for %d\n",getClk(), slept);
+
+            if(!runningPFinished){
+                cout<< "pushing the running process with remaining time "<< runningProcess.remainingTime <<endl;
+                readyQ.push(runningProcess);
+            }
+
+        }  // End while
+    }
+}
+//Round Robin Algorithm
+void RR_Algorithm()
+{
+    while(noFinished < noProcesses)
+    {
+        if(!roundRobinQ.empty())
+        {
+            runningProcess = roundRobinQ.front();
+            roundRobinQ.pop();
+            setMaskedList();
+            runProcess();
+
+            if (runningProcess.remainingTime>quantum)  // process hasn't finished
+            {
+                sleepingTime = quantum;
+                sleep(sleepingTime);
+                printf("\n I am awake now  at time: %d \n",getClk());
+                releaseBlockedSignals();
+                // update process data
+                runningProcess.remainingTime-=quantum;
+                kill(runningProcess.PID, SIGUSR2);
+                cout<<"\n Pushing Process of ID"<<runningProcess.id<<" at time: "<<getClk()<<endl;
+                roundRobinQ.push(runningProcess);
+                // update process block
+
+                // pause signal
+
+                // meen yt3mlo push elawl?
+            }
+            else   // matet f msh 3wzeenha :)
+            {
+
+                sleepingTime = quantum+1;
+                sleep(sleepingTime);
+                printf("\n I am awake now at time: %d \n",getClk());
+                releaseBlockedSignals();
+                // update process block --> log
+
+            }
+
+        }
+
+    }  // End while
+}
+
+/* Iterates through a list of signals and prints out which signals are in a signal set. */
+void printSignalSet(sigset_t *set)
+{
+    /* This listing of signals may be incomplete. */
+    const int sigList[] = {  SIGINT, SIGKILL,  SIGUSR1,
+                             SIGUSR2, SIGCHLD, SIGCONT, SIGSTOP
+                          };
+    const char *sigNames[] = {  "SIGINT","SIGKILL", "SIGUSR1",
+                                "SIGUSR2", "SIGCHLD", "SIGCONT", "SIGSTOP"
+                             };
+    const int sigLen = 7;
+
+    for(int i=0; i<sigLen; i++)
+    {
+        int ret = sigismember(set, sigList[i]);
+        if(ret == -1)
+        {
+            perror("sigismember:");
+            exit(EXIT_FAILURE);
+        }
+        else if(ret == 1)
+        {
+            printf("Signal %s=%d IS in the set.\n", sigNames[i], sigList[i]);
+        }
+        else
+        {
+            printf("Signal %s=%d is not in the set.\n", sigNames[i], sigList[i]);
+        }
+    }
+}
+
+
+void releaseBlockedSignals()
+{
+    /* Look for any signals that are currently blocked---and would be
+     * triggered once they are unmasked. */
+    sigset_t pendingSignalSet;
+    sigpending(&pendingSignalSet);
+    printf("--- Signals which are blocked/pending: ---\n");
+    printSignalSet(&pendingSignalSet);
+
+    printf("Removing all signals from mask.\n");
+    if(sigemptyset(&set) != 0)
+    {
+        perror("sigemptyset:");
+        exit(EXIT_FAILURE);
+    }
+    if(sigprocmask(SIG_SETMASK, &set, NULL) != 0)
+    {
+        perror("sigprocmask:");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void setMaskedList()
+{
+    // update list of masked signals
+    if(sigaddset(&set, SIGUSR1) != 0) // Add SIGUSR1 to our set
+    {
+        perror("sigaddset:");
+        exit(EXIT_FAILURE);
+    }
+    /* Tell OS that we want to mask our new set of signals---which now includes SIGINT. */
+    if(sigprocmask(SIG_SETMASK, &set, NULL) != 0)
+    {
+        perror("sigprocmask:");
+        exit(EXIT_FAILURE);
+    }
+    /* Now, SIGINT will be "blocked". */
+    //  printf("--- NEW signal mask for this process: ---\n");
+    //  printSignalSet(&set);
 
 }

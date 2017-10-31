@@ -230,12 +230,12 @@ void HPF_Algorithm()
         {
             runningProcess = readyQ.top();
             readyQ.pop();
-            sleepingTime = runningProcess.remainingTime+1;
+            sleepingTime = runningProcess.remainingTime+1; //sleep more than remaining time -> interrupted when process exits
             setMaskedList();
             runProcess();
             sleep(sleepingTime);
             printf("\n I am awake now at time %d\n",getClk());
-            releaseBlockedSignals();
+            releaseBlockedSignals();  //Go handle signals
 
         }
 
@@ -256,7 +256,7 @@ void SRTN_Algorithm()
             runProcess();
             int tBeforeSleeping=getClk();
             pause();
-            kill(runningProcess.PID, SIGUSR2);
+            kill(runningProcess.PID, SIGUSR2);  //Send process signal to pause 
             int tAfterSleeping=getClk();
             int slept=tAfterSleeping-tBeforeSleeping;
             runningProcess.remainingTime-=slept;
@@ -284,7 +284,7 @@ void RR_Algorithm()
             setMaskedList();
             runProcess();
 
-            if (runningProcess.remainingTime>quantum)  // process hasn't finished
+            if (runningProcess.remainingTime>quantum)  // process will not finish this time
             {
                 sleepingTime = quantum;
                 sleep(sleepingTime);
@@ -292,7 +292,7 @@ void RR_Algorithm()
                 releaseBlockedSignals();
                 // update process data
                 runningProcess.remainingTime-=quantum;
-                kill(runningProcess.PID, SIGUSR2);
+                kill(runningProcess.PID, SIGUSR2);  //send process signal to pause
                 cout<<"\n Pushing Process of ID"<<runningProcess.id<<" at time: "<<getClk()<<endl;
                 roundRobinQ.push(runningProcess);
                 // update process block
@@ -304,7 +304,7 @@ void RR_Algorithm()
             else   // matet f msh 3wzeenha :)
             {
 
-                sleepingTime = quantum+1;
+                sleepingTime = quantum+1;  //sleeping time > quantum -> interrupted when process exits
                 sleep(sleepingTime);
                 printf("\n I am awake now at time: %d \n",getClk());
                 releaseBlockedSignals();

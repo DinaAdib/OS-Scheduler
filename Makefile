@@ -1,5 +1,5 @@
 build: 
-	g++ clk.cpp -o clock.out
+	g++ clk.cpp -o clk.out
 	g++ -std=c++0x scheduler.cpp -o sch.out
 	#g++ FilesGenerator.cpp -o Files.out
 	g++ -std=c++0x processGenerator.cpp -o processGenerator
@@ -11,5 +11,5 @@ clean:
 all: clean build
 
 run:
-	clear
+	#clear
 	./processGenerator

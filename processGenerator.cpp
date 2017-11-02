@@ -1,57 +1,45 @@
 #include "headers.h"
 
-// Global Variables
+/*----------Global variables-----------*/
 queue <struct processData> processes;
-
-/*----------Functions' headers-----------*/
-void signalChild(int);
-void ClearResources(int);
-void Load();  //Load from input file
-void Send(key_t pGeneratorSendQid, struct processData processToSend);
 int clkID, schdID;
 int choice;
-int quantum;
+int quantum=0;
+int currentTime=0;
+
+/*----------Functions' headers-----------*/
+void clearResources(int);
+void loadInputFile();         
+void Send(key_t pGeneratorSendQid, struct processData processToSend);
+void readUserInput();
+//Signals' Handlers
+void signalChildHandler(int);  
+//void continuePlease(int);  
 
 int main()
 {
-
     /*-----------Local Variables--------*/
-    int i = 0; //index incremented when current time = arrival time of a process to index next upcoming process
-
+    int indexProcesses=0;
     string choiceStr, quantumStr, nProcessesStr;
-
+    struct processData topProcess;
     key_t pGeneratorSendQid;
 
+    /*-----------Communication with other files--------*/
+    signal(SIGINT,clearResources);
+    //signal(SIGCONT,continuePlease);
+    signal(SIGCHLD,signalChildHandler);
+
     pGeneratorSendQid= msgget(12614, IPC_CREAT | 0644);
+    if(pGeneratorSendQid == -1) {perror("Error in creating process generator send Queue"); exit(-1);}
 
-    if(pGeneratorSendQid == -1)
-    {
-        perror("Error in creating process generator send Queue");
-        exit(-1);
-    }
+    /*-----------Reading input--------*/
+    readUserInput();
+    loadInputFile();
+    if (nProcesses<1) {cout << "@clk "<<currentTime<<" : ProcessGenerator: The processes file is apparently empty. I'll close for now."<<endl; clearResources(1);}
 
-
-    signal(SIGINT,ClearResources);
-    signal(SIGCHLD,signalChild);
-
-    //TODO:
-    // 1-Ask the user about the chosen scheduling Algorithm and its parameters if exists.
-    printf("\n Choose the scheduling algorithm: \n 1-Non Pre-emptive HPF \n 2-Pre-emptive SRTN \n 3-Round Robin: \n");
-    scanf("%d",&choice);
-    choice--;
-    if(choice == 2)
-    {
-        printf("\n Please enter quantum value: \n");
-        scanf("%d",&quantum);
-    }
-    else quantum = 0;
-    // 2-Initiate and create Scheduler and Clock processes.
-
-
-
-    Load();
-    struct processData top=processes.front();
-        //Create scheduler and send chosen algorithm and quantum for RR
+    cout << "==============================================================================" <<endl;
+    
+    /*-----------Forking the scheduler--------*/
     schdID=fork();
     if (schdID==0) //child executes itself
     {
@@ -61,97 +49,56 @@ int main()
         char*const schPar[] = {(char*)choiceStr.c_str(), (char*)quantumStr.c_str(), (char*)nProcessesStr.c_str(), 0 };
         execv("./sch.out",schPar);
     }
-    //for testing
-    printf("\n top arrival time= %d",top.arrivalTime);
-
-
-
-    //Create clock process
+    /*-----------Forking the clock--------*/
     clkID=fork();
     if (clkID==0) //child executes itself
     {
-        cout<<"starting";
+        cout<<"@clk 0: clock is now starting..."<<endl;
         char*const clkPar[] = { 0 };
         execv("./clk.out", clkPar);
     }
 
     initClk();
 
+    /*-----------Sending processes to the scheduler--------*/
+    topProcess=processes.front();
 
-    // 3-use this function after creating clock process to initialize clock
+    currentTime= getClk();
+    cout<<"@clk "<<currentTime<<" : ProcessGenerator: I have a number of processes equals: "<<nProcesses<<endl;
 
-
-
-    /////Toget time use the following function
-    int currentT= getClk();
-    printf("current time is %d\n",currentT);
-    //TODO:  Generation Main Loop
-    //4-Creating a data structure for process  and  provide it with its parameters
-
-    //5-Send the information to  the scheduler at the appropriate time
-    //(only when a process arrives) so that it will be put it in its turn.
-    //cout for testing
-    cout << "\n number of processes: " <<nProcesses;
-
-    //while not all processes are sent, stay in while loop (Finishes when all processes arrive)
-    while(i <= nProcesses)
+    //while not all processes are sent, stay in while loop (finishes only when all processes arrive)
+    while(indexProcesses <= nProcesses)
     {
-        currentT=getClk();
-
-        if(top.arrivalTime == currentT)
-        {
-            Send(pGeneratorSendQid, top); //Send message to scheduler containing this process data
-            kill(schdID, SIGUSR1);  //Send signal to scheduler to wake it up to receive arriving process
-            processes.pop();
-            top=processes.front();
-            i++;
+        currentTime=getClk();
+        if(topProcess.arrivalTime == currentTime)
+        {	
+        	//sleep(1);
+            Send(pGeneratorSendQid, topProcess);    //Send message to scheduler containing this process data
+            kill(schdID, SIGUSR1);                  //Send signal to scheduler to wake it up to receive arriving process
+            processes.pop();                        
+            topProcess=processes.front();           
+            indexProcesses++;
         }
     }
-    while(1) {}
-
-}
-
-
-void signalChild(int signum)
-{
-    int pid , stat_loc;
-    printf("\n Received signal %d from child", signum );
-    pid=wait(&stat_loc);
-    printf("\n pid= %d",pid);
-    if(!(stat_loc& 0x00FF))
-    { printf("\n Scheduler terminated with exit code %d\n", stat_loc>>8);}
-    else
-    {
-        printf("\n Rana hatetganen\n");
-        ClearResources(1);
-    }
-
-    return;
-}
-
-void ClearResources(int)
-{  printf("\n Inside clear resources");
-    destroyClk(true);
-    exit(1);
-    //TODO: it clears all resources in case of interruption
+    while(1) {sleep(1);}
 }
 
 
 /*------------Functions------------*/
-// This functions loads the input file into a queue
-void Load()
+// This function loads the input file into a queue
+void loadInputFile()
 {
     char Data[500];
     ifstream inp("processes.txt");
 
     //Load processes info
     struct processData p;
-
+    cout<<"ProcessGenerator: Note we take up to 500 charachters from the .txt file."<<endl;
     while( inp.getline(Data,500))
     {
-
-        printf("\nData= %s \n ", Data);
-        if(Data[0]!='#')
+        
+        //printf("\nData= %s \n ", Data);
+        if(isdigit(Data[0]))
         {
             stringstream ss(Data); //using stringstream to split string to int
             while(ss.good())
@@ -165,17 +112,17 @@ void Load()
             p.remainingTime = p.runningTime;
             switch (choice)
             {
-            case HPF:
-                p.criteria = (10 - p.priority);
-                break;
+                case HPF:
+                    p.criteria = (10 - p.priority);
+                    break;
 
-            case SRTN:
-                p.criteria = p.remainingTime;
-                break;
+                case SRTN: 
+                    p.criteria = p.remainingTime;
+                    break;
 
-            default:
-                p.criteria =0;
-                break;
+                default:
+                    p.criteria =0;
+                    break;
             }
             processes.push(p); // insert to queue
             nProcesses++;
@@ -185,7 +132,22 @@ void Load()
     return;
 }
 
-/*------------------Functions---------------*/
+//This function is to output and read data from the user
+void readUserInput()
+{
+    cout<<"\n Choose the scheduling algorithm: \n 1-Non Pre-emptive HPF \n 2-Pre-emptive SRTN \n 3-Round Robin."<<endl;
+    do {scanf("%d",&choice);}
+    while (choice<1 || choice>3);
+
+    choice--;
+    if(choice == RoundRobin)
+    {
+        printf("\n Please enter the value of one quantum: ");
+        do {scanf("%d",&quantum);}
+        while (quantum<1);
+    }
+    cout<<"ProcessGenerator: You chose number "<<choice+1<<", and quantum = "<<quantum<<". Good Luck :)"<<endl;
+}
 
 //This function is used to send process data to scheduler when current time = arrival time of process
 void Send(key_t pGeneratorSendQid, struct processData processToSend)
@@ -194,11 +156,38 @@ void Send(key_t pGeneratorSendQid, struct processData processToSend)
     struct processMsgBuff message;
     message.mProcess = processToSend;
     message.mtype = processToSend.arrivalTime;
-    cout << "\nProcess to be sent: ID = \n " << message.mProcess.id;
+    currentTime=getClk();
+    cout<<"@clk "<<currentTime<<" : ProcessGenerator: Process to be sent is of ID = " << message.mProcess.id<<endl;
     send_val = msgsnd(pGeneratorSendQid, &message, sizeof(message.mProcess), !IPC_NOWAIT);
 
     if(send_val == -1)
         perror("Error in send \n ");
-    else printf("\n Process sent successfully \n ");
+    else cout<<"@clk "<<currentTime<<" : ProcessGenerator: I sent the process successfully."<<endl;
 
 }
+
+// This function is signal child handler. It is called when a child sends a this signal
+void signalChildHandler(int signum)
+{
+    int pid , stat_loc;
+    currentTime= getClk();
+    cout<<"@clk "<<currentTime<<" : ProcessGenerator: I received a signal"<<signum<<" from a child."<<endl;
+    pid=wait(&stat_loc);
+    cout<<"@clk "<<currentTime<<" : ProcessGenerator: pid="<<pid<<endl;
+    if(!(stat_loc& 0x00FF)) cout<<"@clk "<<currentTime<<" : ProcessGenerator: The scheduler terminated with exit code "<< (stat_loc>>8) <<endl;
+    else {cout<<"@clk "<<currentTime<<" : ProcessGenerator: I think Rana will go nuts."<<endl; clearResources(1);}
+    return;
+}
+
+//This function is called upon exiting to clear the resources and exit
+void clearResources(int)
+{   currentTime= getClk();
+    cout<<"@clk "<<currentTime<<" : ProcessGenerator: Clearing resources. Bye :)"<<endl;
+    destroyClk(true);
+    exit(1);
+}
+//This function is called upon the forking of the scheduler
+/*void continuePlease(int)
+{   return;
+}
+*/

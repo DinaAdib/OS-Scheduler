@@ -129,8 +129,11 @@ void runProcess()
         pB.remainingTime=runningProcess.remainingTime;
         pB.runningTime=runningProcess.runningTime;
         pB.priority=runningProcess.priority;
+        pB.waitTime=0;
+        pB.finishTime=0;
         pB.startTime=getClk();
         pB.state="STARTED";
+        pB.id=runningProcess.id;
         processTable.push_back(pB);
         outputCurrentStatus();
         runningProcess.PID= fork();
@@ -267,7 +270,7 @@ void SRTN_Algorithm()
             	processTable[runningProcess.id-1].state = "STOPPED";
             	processTable[runningProcess.id-1].remainingTime = runningProcess.remainingTime;
             	processTable[runningProcess.id-1].finishTime = getClk(); //needed to get instantinous wait time, we can check if remaining time>0 then this finish time is not final
-                cout<< " Scheduler: Pushing the running process #"<<runningProcess.id<<" in the ready queue again and its remaining time="<< runningProcess.remainingTime <<endl;
+                cout<< " Scheduler: Pushing the running process #"<<runningProcess.id<<" in the ready queue again and its remaining time="<< runningProcess.remainingTime <<" and my wait time = "<<processTable[runningProcess.id-1].waitTime<<endl;
                 outputCurrentStatus();
                 readyQ.push(runningProcess);
             }
@@ -297,7 +300,8 @@ void RR_Algorithm()
 
                 //Updating process data
                 runningProcess.remainingTime-=quantum;
-
+                processTable[runningProcess.id-1].remainingTime-=quantum;
+                
                 //Sending a signal to pause the process
                 kill(runningProcess.PID, SIGUSR2);  
                 processTable[runningProcess.id-1].state = "STOPPED";

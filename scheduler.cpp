@@ -202,7 +202,7 @@ void finishedChildHandler(int signum)
     int pid , stat_loc;
     cout << " Scheduler: I am recieving signal #"<<signum<<" from a running process."<<endl;
     pid=wait(&stat_loc);
-    if(pid==runningProcaess.PID&&!(stat_loc& 0x00FF))
+    if(pid==runningProcess.PID&&!(stat_loc& 0x00FF))
     {
     	
     	runningProcessFinished = true;

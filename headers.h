@@ -20,7 +20,7 @@
 #include <sstream>
 #include <queue>
 #include <string>
-
+#include <math.h>
 
 
 using namespace std;
@@ -40,6 +40,7 @@ struct processData {
     int remainingTime;
     int criteria;
     int PID;
+    int runningID; //order of running
 
     processData(){}
     processData(int i, int a, int r, int p)
@@ -84,6 +85,7 @@ processBlock(struct processData data) {
 	remainingTime=data.remainingTime;
 	
 }
+
 }processBlock;
 //Struct message buffer to be used when sending a process from process generator to scheduler
 struct processMsgBuff
@@ -151,4 +153,3 @@ void destroyClk(bool terminateAll)
     if(terminateAll)
         killpg(getpgrp(),SIGINT);
 }
-

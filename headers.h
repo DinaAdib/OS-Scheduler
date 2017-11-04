@@ -20,7 +20,7 @@
 #include <sstream>
 #include <queue>
 #include <string>
-#include <math.h>
+
 
 
 using namespace std;
@@ -151,3 +151,4 @@ void destroyClk(bool terminateAll)
     if(terminateAll)
         killpg(getpgrp(),SIGINT);
 }
+

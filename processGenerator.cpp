@@ -14,7 +14,6 @@ void Send(key_t pGeneratorSendQid, struct processData processToSend);
 void readUserInput();
 //Signals' Handlers
 void signalChildHandler(int);
-//void continuePlease(int);
 
 int main()
 {
@@ -26,7 +25,6 @@ int main()
 
     /*-----------Communication with other files--------*/
     signal(SIGINT,clearResources);
-    //signal(SIGCONT,continuePlease);
     signal(SIGCHLD,signalChildHandler);
 
     pGeneratorSendQid= msgget(12614, IPC_CREAT | 0644);
@@ -187,8 +185,4 @@ void clearResources(int)
     destroyClk(true);
     exit(1);
 }
-//This function is called upon the forking of the scheduler
-/*void continuePlease(int)
-{   return;
-}
-*/
+

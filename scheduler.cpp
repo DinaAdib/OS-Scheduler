@@ -68,7 +68,7 @@ int main(int argc, char* argv[])
     }
 
 
-    while(roundRobinQ.size() <1 && readyQ.size() < 1) {}  // wait for the first process 
+    while(roundRobinQ.size() <1 && readyQ.size() < 1) {}  // wait for the first process
 
 	afterAWhile=true;
 	minStartTime=getClk();
@@ -143,7 +143,7 @@ void runProcess()
         processTable[pBIndex].state = "RESUMED";
         kill(runningProcess.PID, SIGCONT); //Send a signal to process to continue running
     }
-	//update process wait time 
+	//update process wait time
         processTable[pBIndex].waitTime += (getClk() - processTable[pBIndex].finishTime); //finish time here is the last stored time it paused (initially arrival time)
         outputCurrentStatus();
 }
@@ -216,7 +216,7 @@ void finishedChildHandler(int signum)
         wta = (double)(((double)((processTable[pBIndex].finishTime)-(processTable[pBIndex].arrivalTime)))/(processTable[pBIndex].runningTime));
         weightedTurnaround.push_back(wta);
         sumWeightedTurnaround += wta;
-	 //Delete finished process data from process table 
+	 //Delete finished process data from process table
         processTable.erase(processTable.begin() + pBIndex);
     }
 
@@ -268,7 +268,7 @@ void SRTN_Algorithm()
             if(!runningProcessFinished) // if the process is not finished yet
             {
             	kill(runningProcess.PID, SIGUSR2);  //Send process signal to pause
-		    //Update process block 
+		    //Update process block
             	processTable[pBIndex].state = "STOPPED";
             	processTable[pBIndex].remainingTime = runningProcess.remainingTime;
             	processTable[pBIndex].finishTime = getClk(); //needed to get instantinous wait time, we can check if remaining time>0 then this finish time is not final
@@ -383,7 +383,7 @@ void releaseBlockedSignals()
         exit(EXIT_FAILURE);
     }
 }
-//Function to set list of signals to be masked (blocked) when the scheduler sleeps 
+//Function to set list of signals to be masked (blocked) when the scheduler sleeps
 void setMaskedList()
 {
     // update list of masked signals
@@ -431,10 +431,10 @@ void outputStatFile ()
     ofstream myfile ("scheduler.perf");
     if (myfile.is_open())
     {
-        myfile << "CPU utilization=" << setprecision(2) << utilization <<"%.\n";
-        myfile << "Avg WTA=" << setprecision(2) << avgWeightedTurnaround <<"\n";
-        myfile << "Avg Waiting=" << setprecision(2) << avgWaitTime <<"\n";
-        myfile << "Std WTA=" << setprecision(2) << stdDev <<"\n";
+        myfile << "CPU utilization=" << setprecision(3) << utilization <<"%.\n";
+        myfile << "Avg WTA=" << setprecision(3) << avgWeightedTurnaround <<"\n";
+        myfile << "Avg Waiting=" << setprecision(3) << avgWaitTime <<"\n";
+        myfile << "Std WTA=" << setprecision(3) << stdDev <<"\n";
         myfile.close();
     }
     else cout << "Unable to open file";
@@ -454,8 +454,8 @@ void outputCurrentStatus ()
        	{
        	double x;
        	x=((processTable[pBIndex].finishTime)-(processTable[pBIndex].arrivalTime));
-       	schedulerLog << " TA " << setprecision(2)<<x;
-       	schedulerLog << " WTA " << setprecision(2)<<x/(processTable[pBIndex].runningTime);
+       	schedulerLog << " TA " << setprecision(3)<<x;
+       	schedulerLog << " WTA " << setprecision(3)<<x/(processTable[pBIndex].runningTime);
        	}
 
        	schedulerLog <<endl;

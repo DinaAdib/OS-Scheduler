@@ -9,12 +9,12 @@ int currentTime=0;
 
 /*----------Functions' headers-----------*/
 void clearResources(int);
-void loadInputFile();         
+void loadInputFile();
 void Send(key_t pGeneratorSendQid, struct processData processToSend);
 void readUserInput();
 //Signals' Handlers
-void signalChildHandler(int);  
-//void continuePlease(int);  
+void signalChildHandler(int);
+//void continuePlease(int);
 
 int main()
 {
@@ -38,7 +38,7 @@ int main()
     if (nProcesses<1) {cout << "@clk "<<currentTime<<" : ProcessGenerator: The processes file is apparently empty. I'll close for now."<<endl; clearResources(1);}
 
     cout << "==============================================================================" <<endl;
-    
+
     /*-----------Forking the scheduler--------*/
     schdID=fork();
     if (schdID==0) //child executes itself
@@ -71,12 +71,12 @@ int main()
     {
         currentTime=getClk();
         if(topProcess.arrivalTime == currentTime)
-        {	
+        {
         	//sleep(1);
             Send(pGeneratorSendQid, topProcess);    //Send message to scheduler containing this process data
             kill(schdID, SIGUSR1);                  //Send signal to scheduler to wake it up to receive arriving process
-            processes.pop();                        
-            topProcess=processes.front();           
+            processes.pop();
+            topProcess=processes.front();
             indexProcesses++;
         }
     }
@@ -96,7 +96,7 @@ void loadInputFile()
     cout<<"ProcessGenerator: Note we take up to 500 charachters from the .txt file."<<endl;
     while( inp.getline(Data,500))
     {
-        
+
         //printf("\nData= %s \n ", Data);
         if(isdigit(Data[0]))
         {
@@ -116,7 +116,7 @@ void loadInputFile()
                     p.criteria = (10 - p.priority);
                     break;
 
-                case SRTN: 
+                case SRTN:
                     p.criteria = p.remainingTime;
                     break;
 
@@ -175,7 +175,8 @@ void signalChildHandler(int signum)
     pid=wait(&stat_loc);
     cout<<"@clk "<<currentTime<<" : ProcessGenerator: pid="<<pid<<endl;
     if(!(stat_loc& 0x00FF)) cout<<"@clk "<<currentTime<<" : ProcessGenerator: The scheduler terminated with exit code "<< (stat_loc>>8) <<endl;
-    else {cout<<"@clk "<<currentTime<<" : ProcessGenerator: I think Rana will go nuts."<<endl; clearResources(1);}
+    else {cout<<"@clk "<<currentTime<<" : ProcessGenerator: I think Rana will go nuts."<<endl; }
+    clearResources(1);
     return;
 }
 

@@ -1,8 +1,3 @@
-//
-// Created by rana-afifi on 10/21/17.
-//
-
-
 #include <stdio.h>      //if you don't use scanf/printf change this include
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -21,6 +16,7 @@
 #include <queue>
 #include <string>
 #include <math.h>
+#include <vector>
 
 
 using namespace std;
@@ -87,6 +83,7 @@ processBlock(struct processData data) {
 }
 
 }processBlock;
+
 //Struct message buffer to be used when sending a process from process generator to scheduler
 struct processMsgBuff
 {

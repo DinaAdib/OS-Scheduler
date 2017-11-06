@@ -432,10 +432,10 @@ void outputStatFile ()
     ofstream myfile ("scheduler.perf");
     if (myfile.is_open())
     {
-        myfile << "CPU utilization=" << utilization <<"%.\n";
-        myfile << "Avg WTA=" << avgWeightedTurnaround <<"\n";
-        myfile << "Avg Waiting=" << avgWaitTime <<"\n";
-        myfile << "Std WTA=" << stdDev <<"\n";
+        myfile << "CPU utilization=" << setprecision(2) << utilization <<"%.\n";
+        myfile << "Avg WTA=" << setprecision(2) << avgWeightedTurnaround <<"\n";
+        myfile << "Avg Waiting=" << setprecision(2) << avgWaitTime <<"\n";
+        myfile << "Std WTA=" << setprecision(2) << stdDev <<"\n";
         myfile.close();
     }
     else cout << "Unable to open file";
@@ -454,8 +454,8 @@ void outputCurrentStatus ()
        	{
        	double x;
        	x=((processTable[pBIndex].finishTime)-(processTable[pBIndex].arrivalTime));
-       	schedulerLog << " TA " <<x;
-       	schedulerLog << " WTA " <<x/(processTable[pBIndex].runningTime);
+       	schedulerLog << " TA " << setprecision(2)<<x;
+       	schedulerLog << " WTA " << setprecision(2)<<x/(processTable[pBIndex].runningTime);
        	}
 
        	schedulerLog <<endl;

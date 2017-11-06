@@ -8,7 +8,7 @@ struct processData topProcess, runningProcess;
 struct msqid_ds buf;
 key_t schedulerRcvQid;
 string remainingTimeStr;
-int choice= 0, quantum = 0, noProcesses = 0, noFinished = 0, sleepingTime = 0, currentTime=0, runningProcessStartTime =0, pBIndex = 0;
+int choice= 0, quantum = 0, noProcesses = 0, noFinished = 0, sleepingTime = 0, currentTime=0, timeBeforePausing =0, pBIndex = 0;
 int maxFinishTime=0, minStartTime=0;     //maximum finish time, minimium start time
 int rc,num_messages;
 int sumRunningTime=0;                           //sum of running time
@@ -261,7 +261,7 @@ void SRTN_Algorithm()
 
            	runProcess();
 
-            runningProcessStartTime=getClk();
+            timeBeforePausing=getClk();
             do {
             pause();
             }
@@ -465,8 +465,8 @@ void outputCurrentStatus ()
 }
 void updateRemainingTime()
 {
-	int slept=getClk()-runningProcessStartTime;
-	runningProcessStartTime = getClk();
+	int slept=getClk()-timeBeforePausing;
+	timeBeforePausing = getClk();
 	runningProcess.remainingTime-=slept;
     runningProcess.criteria-=slept;
 	processTable[pBIndex].remainingTime = runningProcess.remainingTime;

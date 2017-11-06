@@ -422,7 +422,7 @@ void outputStatFile ()
         {
             //calculating weighted turnaround
             double wta=0.0;                                     //weighted turn around
-            wta = ((processTable[i].finishTime)-(processTable[i].arrivalTime))/(processTable[i].runningTime);
+            wta = (double)(((double)((processTable[i].finishTime)-(processTable[i].arrivalTime)))/(processTable[i].runningTime));
             weightedTurnaround.push_back(wta);
             sumWeightedTurnaround += wta;
             sumWaitTime += processTable[i].waitTime;
@@ -431,11 +431,11 @@ void outputStatFile ()
             if(maxFinishTime < processTable[i].finishTime) maxFinishTime = (processTable[i].finishTime);
             if(minStartTime > processTable[i].startTime) minStartTime = (processTable[i].startTime);
         }
-
+    printf("Max finish time = %d. Min Start time = %d. Running Time %d \n", maxFinishTime, minStartTime, sumRunningTime);
     //utilization =  sum running time / (max finish - min start)
     //utilization *100
-    utilization= (sumRunningTime/(maxFinishTime-minStartTime)) *100;
-
+    utilization= (double)(sumRunningTime/(double)(maxFinishTime-minStartTime)) *100;
+    cout<< utilization <<endl;
     avgWeightedTurnaround= sumWeightedTurnaround/processTable.size();
     avgWaitTime = sumWaitTime/processTable.size();
 

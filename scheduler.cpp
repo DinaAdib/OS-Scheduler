@@ -416,14 +416,14 @@ void outputStatFile ()
 
     utilization= (double)(sumRunningTime/(double)(maxFinishTime-minStartTime)) *100;
     cout<< utilization <<endl;
-    avgWeightedTurnaround= sumWeightedTurnaround/noProcesses;
-    avgWaitTime = sumWaitTime/noProcesses;
+    avgWeightedTurnaround= (double)sumWeightedTurnaround/(double)noProcesses;
+    avgWaitTime =(double)sumWaitTime/(double)noProcesses;
 
     //Calculating the standard deviation of weighted turnaround
     accum = 0.0;
     for (i=0;i<weightedTurnaround.size();i++)
     {
-        accum += ((weightedTurnaround[i]-avgWeightedTurnaround)*(weightedTurnaround[i]-avgWeightedTurnaround));
+        accum += ((double)(weightedTurnaround[i]-avgWeightedTurnaround)*(double)(weightedTurnaround[i]-avgWeightedTurnaround));
     }
     stdDev = sqrt(accum/(weightedTurnaround.size()-1));
 

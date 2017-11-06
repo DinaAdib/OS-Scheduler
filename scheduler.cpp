@@ -1,98 +1,110 @@
 #include "headers.h"
 
-
-//Signals' Handlers
-void newProcessHandler(int signum);
-void finishedChildHandler(int signum);
-
-//Global Variables
+/*----------Global variables-----------*/
 priority_queue <struct processData> readyQ;
 queue <struct processData> roundRobinQ;
 vector <struct processBlock> processTable;
 struct processData topProcess, runningProcess;
+struct msqid_ds buf;
 key_t schedulerRcvQid;
 string remainingTimeStr;
-int choice= 0;
-int quantum = 0;
-int noProcesses = 0;
-int noFinished = 0;
-int sleepingTime = 0;
-int startTime;
-int endTime;
+int choice= 0, quantum = 0, noProcesses = 0, noFinished = 0, sleepingTime = 0, currentTime=0, runningProcessStartTime =0, pBIndex = 0;
+int maxFinishTime=0, minStartTime=0;     //minimium start time
+int rc,runningCountID=-1,num_messages;
+int sumRunningTime=0;                           //sum of running time
+int sumWaitTime=0;                              //sum of waiting time
+vector <double> weightedTurnaround;             //weighted TA array
+double sumWeightedTurnaround = 0.0;             //sum of weighted TA
+double wta = 0.0f;
 sigset_t set;
+bool runningProcessFinished = false, afterAWhile = false;
 
+// Creating output file: scheduler.log
+ofstream schedulerLog ("scheduler.log");
+
+//if (schedulerLog.is_open()) schedulerLog<<"#At time x process y state arr w total z remain y wait k"<<endl;
 /*---------Functions' Headers-----*/
 void Receive(key_t schedulerRcvQid);
 void runProcess();
+void HPF_Algorithm();
+void SRTN_Algorithm();
+void RR_Algorithm();
+void printSignalSet(sigset_t *set);
 void setMaskedList();
 void releaseBlockedSignals();
-void HPFAlgorithm();
-void printSignalSet(sigset_t *set);
+void outputStatFile ();
+void outputCurrentStatus ();
+void updateRemainingTime();
+//Signals' Handlers
+void newProcessHandler(int signum);
+void finishedChildHandler(int signum);
+int getIndexByID(int id);
 
 int main(int argc, char* argv[])
 {
+	/*-----------Communication with other files--------*/
+    signal (SIGUSR1, newProcessHandler);
+    signal (SIGCHLD, finishedChildHandler);
+    //kill(getppid(),SIGCONT);
 
-    cout<< "count of arg: "<< argc <<endl;
+ 	//Create queue for scheduler to receive messages
+    schedulerRcvQid= msgget(12614, IPC_CREAT | 0644);
 
-    cout<< "arg 1: "<< argv[0]<<endl;
-    cout<< "arg 2: "<< argv[1]<<endl;
-    cout<< "arg 3: "<< argv[2]<<endl;
-
-    choice = atoi(argv[0]);
+	choice = atoi(argv[0]);
     quantum = atoi(argv[1]);
     noProcesses = atoi(argv[2]);
-
-
-    printf( "\n  number of processes: %d", noProcesses );
+    runningProcess.remainingTime=0; //testing
+    runningProcess.id=0;
 
     initClk();
+    currentTime= getClk();
+    cout << " Scheduler: I recieved "<<argc<<" arguments from process generator."<<endl;
+    cout << " Scheduler: Choice="<< argv[0]<<", Quantum="<< argv[1]<<", and number of processes="<< argv[2]<<"."<<endl;
 
-    //Create queue for scheduler to receive messages
-    schedulerRcvQid= msgget(12614, IPC_CREAT | 0644);
+
 
     if(schedulerRcvQid == -1)
     {
         perror(" \n Error in creating process receiving queue in scheduler");
         exit(-1);
     }
-    //Signals
-    signal (SIGUSR1, newProcessHandler);
-    signal (SIGCHLD, finishedChildHandler);
 
-// while(readyQ.size() < noProcesses && roundRobinQ.size()<noProcesses) {}
-    while(readyQ.size() <1) {}  // wait for the first process
-    cout<< "Ready Queue Size = \n " << readyQ.size();
 
+	// while(readyQ.size() < noProcesses && roundRobinQ.size()<noProcesses) {}
+    while(roundRobinQ.size() <1 && readyQ.size() < 1) {}  // wait for the first process ---> WILL BE CHANGED
+
+    //cout<< "RRQ Queue Size = \n " << roundRobinQ.size();
+	afterAWhile=true;
+	minStartTime=getClk();
     switch (choice)
-    {
-    case HPF:
-        cout<< "\n In HPF" <<endl;
-        startTime=getClk();
-        HPFAlgorithm();
-        endTime=getClk();
+	{
+	    case HPF:
+	        cout << "@clk "<<minStartTime<<" : Scheduler: Intiating HPF Algorithm..." <<endl;
+	        HPF_Algorithm();
+	        maxFinishTime=getClk();
+	        cout << "@clk "<<maxFinishTime<<" : Scheduler: Finished finally, HPF Algorithm running time= "<<maxFinishTime-minStartTime<<endl;
+	        break;
 
-        printf("\n Total Running Time %d \n",endTime-startTime);
+	    case SRTN:
+	        cout << "@clk "<<minStartTime<<" : Scheduler: Intiating SRTN Algorithm..." <<endl;
+	        SRTN_Algorithm();
+	        maxFinishTime=getClk();
+			cout << "@clk "<<maxFinishTime<<" : Scheduler: Finished finally, SRTN Algorithm running time= "<<maxFinishTime-minStartTime<<endl;
+	        break;
 
-        break;
+	    case RoundRobin:
 
-    case SRTN:
-
-        break;
-
-    case RoundRobin:
-
-        break;
-
-    default:
-        break;
+	        cout << "@clk "<<minStartTime<<" : Scheduler: Intiating RoundRobin Algorithm..." <<endl;
+	        RR_Algorithm();
+	        maxFinishTime=getClk();
+	        cout << "@clk "<<maxFinishTime<<" : Scheduler: Finished finally, RoundRobin Algorithm running time= "<<maxFinishTime-minStartTime<<endl;
+	        break;
     }
 
-    //upon termination release clock
-
-    printf("\n Scheduler Terminating \n");
-
+    cout << "@clk "<<maxFinishTime<<" : Scheduler: I will close now."<<endl;
+    if (schedulerLog.is_open()) schedulerLog.close();
+    outputStatFile();
     destroyClk(true);
-
     exit(1);
 }
 
@@ -101,36 +113,47 @@ int main(int argc, char* argv[])
 //This function is used to run process on top of readyQueue
 void runProcess()
 {
-    //runningProcess = topProcess;
-    printf("\n In the run process");
+    runningProcessFinished = false;
+    cout << " Scheduler: Running a new process."<<endl;
     if(runningProcess.runningTime == runningProcess.remainingTime)
     {
-        struct processBlock pB;
+    	//If entered here, then this process is a NEW process
+    	runningCountID++;
+    	//vector<processBlock>::iterator iter= find_if(processTable.begin(), processTable.end(),findProcessByID(runningProcess.id));
+         struct processBlock pB;
+         pB.id = runningProcess.id;
         pB.arrivalTime=runningProcess.arrivalTime;
         pB.remainingTime=runningProcess.remainingTime;
         pB.runningTime=runningProcess.runningTime;
         pB.priority=runningProcess.priority;
         pB.startTime=getClk();
-        pB.state="started";
+        pB.finishTime=pB.arrivalTime;
+        pB.waitTime = 0;
+        pB.state="STARTED";
         processTable.push_back(pB);
+        pBIndex = getIndexByID(runningProcess.id);
+        printf("Index of starting process is %d\n",pBIndex);
         runningProcess.PID= fork();
-
         if(runningProcess.PID==0)
         {
             remainingTimeStr = to_string(runningProcess.remainingTime);
-
-            printf("\n I am the child. my process number = %d, remaining time= %d, criteria = %d\n ", runningProcess.id, runningProcess.remainingTime, runningProcess.criteria);
-            cout << remainingTimeStr <<endl;
-
+            cout << " Process"<<runningProcess.id<<": I started with remaining time="<<runningProcess.remainingTime<<" and criteria="<<runningProcess.criteria<<endl;
+            //cout << remainingTimeStr <<endl;
             char*const processPar[] = {(char*)remainingTimeStr.c_str(), 0};
             execv("./process.out", processPar);
         }
     }
     else
     {
-        processTable[runningProcess.id-1].state = "resumed";
-        kill(runningProcess.PID, SIGCONT); //Send signal to process to continue running
+        pBIndex = getIndexByID(runningProcess.id);
+        printf("Index of starting process is %d\n",pBIndex);
+    	//If entered here, then this process is a RESUMING process
+        cout<< " Process"<<runningProcess.id<<": I resumed, with remaining time ="<< runningProcess.remainingTime<<" and my running time equals "<<runningProcess.runningTime<<endl;
+        processTable[pBIndex].state = "RESUMED";
+        kill(runningProcess.PID, SIGCONT); //Send a signal to process to continue running
     }
+        processTable[pBIndex].waitTime += (getClk() - processTable[pBIndex].finishTime);
+        outputCurrentStatus();
 }
 
 //This function is used to receive processes from process generator
@@ -138,20 +161,32 @@ void Receive(key_t schedulerRcvQid)
 {
     int rec_val;
     struct processMsgBuff message;
-    /* receive all types of messages */
-    rec_val = msgrcv(schedulerRcvQid, &message, sizeof(message.mProcess), 0, !IPC_NOWAIT);
-    printf("\n Received Successfully ID: %d \n", message.mProcess.id);
-    if(rec_val == -1)
-    {
-        perror("\n  fail");
-    }
+    rec_val = 0;
 
-    else
+
+    rc = msgctl(schedulerRcvQid, IPC_STAT, &buf);
+    num_messages = buf.msg_qnum;
+	cout << "@clk "<<getClk()<<" : Scheduler: I am recieving "<<num_messages<<" processes in my buffer now!"<<endl;
+    /* receive all types of messages */
+    for(int j=0; j<num_messages; j++)
     {
-        //insert process data into ready queue
-        if(choice == 2) roundRobinQ.push(message.mProcess);
-        else   readyQ.push(message.mProcess);
-        cout<<"\n Received Successfully ID: "<< message.mProcess.id<<"readyQ size:  \n" << readyQ.size() <<endl;
+        rec_val = msgrcv(schedulerRcvQid, &message, sizeof(message.mProcess), 0, !IPC_NOWAIT);
+
+
+
+        if(rec_val == -1)
+        {
+        	cout << "@clk "<<getClk()<<" : Scheduler: I FAILED to received process #"<<message.mProcess.id<<endl;
+            perror("\n  failure in recieving a process from process generator at the scheduler");
+        }
+
+        else
+        {
+        	cout << "@clk "<<getClk()<<" : Scheduler: I received successfully process #"<<message.mProcess.id<<" I will push it now in the ready queue."<<endl;
+            //inserting process data into ready queue
+            if(choice == 2) roundRobinQ.push(message.mProcess);
+            else   readyQ.push(message.mProcess);
+        }
     }
 }
 
@@ -159,34 +194,45 @@ void Receive(key_t schedulerRcvQid)
 /*------------Signals' Handlers--------------*/
 void newProcessHandler(int signum)
 {
-    cout<<"\nIn the new process handler!!\n";
+    cout << " Scheduler: I am recieving a signal that a new process is arriving."<<endl;
+    if (choice==SRTN && afterAWhile)updateRemainingTime();
     Receive(schedulerRcvQid);
-
 }
 
 void finishedChildHandler(int signum)
 {
     int pid , stat_loc;
-    printf("\n Received signal %d from child", signum );
+    cout << " Scheduler: I am recieving signal #"<<signum<<" from a running process."<<endl;
     pid=wait(&stat_loc);
-    printf("\n pid= %d",pid);
     if(pid==runningProcess.PID&&!(stat_loc& 0x00FF))
     {
-        printf("\n Child Process no %d terminated with exit code %d\n", runningProcess.PID, stat_loc>>8);
-        noFinished++;
-        printf("\n noFinished: %d ",noFinished);
-    }
-    else
-    {
-        printf("\n Dina hatetganen :'( 3shan PID= %d\n",pid);
+
+    	runningProcessFinished = true;
+    	noFinished++;
+    	processTable[pBIndex].state = "FINISHED";
+    	processTable[pBIndex].finishTime = getClk();
+    	processTable[pBIndex].remainingTime = 0;
+    	runningProcess.remainingTime=0;
+    	//processTable[runningProcess.id-1].waitTime = processTable[runningProcess.id-1].finishTime - processTable[runningProcess.id-1].startTime - processTable[runningProcess.id-1].runningTime;
+    	outputCurrentStatus();
+    	cout << "@clk "<<getClk()<<" : Scheduler: process #"<<runningProcess.id<<" terminated with exit code = "<< (stat_loc>>8) <<endl ;
+        cout << " Scheduler: processes finished ="<<noFinished<<" out of "<< noProcesses <<" processes."<<endl;
+        sumRunningTime+=processTable[pBIndex].runningTime;
+        sumWaitTime+=processTable[pBIndex].waitTime;
+        wta = (double)(((double)((processTable[pBIndex].finishTime)-(processTable[pBIndex].arrivalTime)))/(processTable[pBIndex].runningTime));
+        weightedTurnaround.push_back(wta);
+        sumWeightedTurnaround += wta;
+        printf("\nProcess old in this index id = %d \n", processTable[pBIndex].id);
+        processTable.erase(processTable.begin() + pBIndex);
+        printf("\nProcess new in this index id = %d \n", processTable[pBIndex].id);
     }
 
+    //else printf("\n Child process has been paused or continued %d\n",pid);
     return;
 }
-
-/*----------Functions-----------*/
-
-void HPFAlgorithm()
+/*------------Algorithms--------------*/
+//HPF Algorithm
+void HPF_Algorithm()
 {
     while(noFinished < noProcesses)
     {
@@ -194,37 +240,110 @@ void HPFAlgorithm()
         {
             runningProcess = readyQ.top();
             readyQ.pop();
-            sleepingTime = runningProcess.remainingTime+1;
+            sleepingTime = runningProcess.remainingTime+1; //sleep more than remaining time -> interrupted when process exits
             setMaskedList();
             runProcess();
             sleep(sleepingTime);
-            printf("\n I am awake now \n");
-            releaseBlockedSignals();
-
+            cout << "@clk "<<getClk()<<" : Scheduler: I am awake now."<<endl;
+            releaseBlockedSignals();  //Go handle signals
         }
+        else pause();	// to sleep in the gaps
 
     }  // End while
 
 }
 
+//SRTN Algorithm
+void SRTN_Algorithm()
+{
+    while(noFinished < noProcesses)
+    {
+        if(!readyQ.empty())
+        {
+            runningProcess = readyQ.top();
+            readyQ.pop();
+            cout << "@clk "<<getClk()<<" : Scheduler: I will run process #"<< runningProcess.id<< " now, and ready queue size ="<<readyQ.size()<<endl;
+
+           	runProcess();
+
+            runningProcessStartTime=getClk();
+            do {pause();}
+            while(!(readyQ.top().remainingTime<processTable[pBIndex].remainingTime) && !runningProcessFinished);
+            //while((processTable[runningProcess.id-1].remainingTime>0) && (readyQ.empty() || readyQ.top().remainingTime > processTable[runningProcess.id-1].remainingTime));
+
+            if(!runningProcessFinished) // if the process is not finished yet
+            {
+            	kill(runningProcess.PID, SIGUSR2);  //Send process signal to pause
+            	processTable[pBIndex].state = "STOPPED";
+            	processTable[pBIndex].remainingTime = runningProcess.remainingTime;
+            	processTable[pBIndex].finishTime = getClk(); //needed to get instantinous wait time, we can check if remaining time>0 then this finish time is not final
+                cout<< " Scheduler: Pushing the running process #"<<runningProcess.id<<" in the ready queue again and its remaining time="<< runningProcess.remainingTime <<endl;
+                outputCurrentStatus();
+                readyQ.push(runningProcess);
+            }
+
+        }
+        else pause(); // to sleep in the gaps
+    }// End while
+}
+//Round Robin Algorithm
+void RR_Algorithm()
+{
+    while(noFinished < noProcesses)
+    {
+        if(!roundRobinQ.empty())
+        {
+            runningProcess = roundRobinQ.front();
+            roundRobinQ.pop();
+            setMaskedList();
+            runProcess();
+
+            if (runningProcess.remainingTime>quantum)  // The process will not finish this loop
+            {
+                sleepingTime = quantum;
+                sleep(sleepingTime);
+                cout << "@clk "<<getClk()<<" : Scheduler: I am awake now."<<endl;
+                releaseBlockedSignals();
+
+                //Updating process data
+                runningProcess.remainingTime-=quantum;
+
+                //Sending a signal to pause the process
+                kill(runningProcess.PID, SIGUSR2);
+                processTable[pBIndex].state = "STOPPED";
+                processTable[pBIndex].finishTime = getClk(); //needed to get instantinous wait time, we can check if remaining time>0 then this finish time is not final
+                outputCurrentStatus();
+                cout << "@clk "<<getClk()<<" : Scheduler:  Pushing Process #"<<runningProcess.id<<endl;
+                roundRobinQ.push(runningProcess);
+                // update process block --> log
+            }
+            else
+            {
+                sleepingTime = runningProcess.remainingTime +1;  //if the process remaining time = quantum, I want to ensure that the process finishs and sends a signal
+                sleep(sleepingTime);
+                cout << "@clk "<<getClk()<<" : Scheduler: I am awake now."<<endl;
+                releaseBlockedSignals();
+                // update process block --> log
+
+            }
+
+        }
+        else pause(); // to sleep in the gaps
+
+    }  // End while
+}
 
 /* Iterates through a list of signals and prints out which signals are in a signal set. */
 void printSignalSet(sigset_t *set)
 {
     /* This listing of signals may be incomplete. */
-    const int sigList[] = { SIGHUP, SIGINT, SIGQUIT, SIGILL,
-                            SIGABRT, SIGFPE, SIGKILL, SIGSEGV,
-                            SIGPIPE, SIGALRM, SIGTERM, SIGUSR1,
-                            SIGUSR2, SIGCHLD, SIGCONT, SIGSTOP,
-                            SIGTSTP, SIGTTIN, SIGTTOU
+    const int sigList[] = {  SIGINT, SIGKILL,  SIGUSR1,
+                             SIGUSR2, SIGCHLD, SIGCONT, SIGSTOP
                           };
-    const char *sigNames[] = { "SIGHUP", "SIGINT", "SIGQUIT", "SIGILL",
-                               "SIGABRT", "SIGFPE", "SIGKILL", "SIGSEGV",
-                               "SIGPIPE", "SIGALRM", "SIGTERM", "SIGUSR1",
-                               "SIGUSR2", "SIGCHLD", "SIGCONT", "SIGSTOP",
-                               "SIGTSTP", "SIGTTIN", "SIGTTOU"
+    const char *sigNames[] = {  "SIGINT","SIGKILL", "SIGUSR1",
+                                "SIGUSR2", "SIGCHLD", "SIGCONT", "SIGSTOP"
                              };
-    const int sigLen = 19;
+    const int sigLen = 7;
 
     for(int i=0; i<sigLen; i++)
     {
@@ -283,7 +402,86 @@ void setMaskedList()
         exit(EXIT_FAILURE);
     }
     /* Now, SIGINT will be "blocked". */
-    printf("--- NEW signal mask for this process: ---\n");
-    printSignalSet(&set);
+    //  printf("--- NEW signal mask for this process: ---\n");
+    //  printSignalSet(&set);
 
 }
+void outputStatFile ()
+{
+    cout<<" Scheduler: Outputing scheduler.perf file..."<<endl;
+    int i;
+    double utilization;                             //utilization
+    double avgWeightedTurnaround = 0.0;             //average weighted TA
+    double avgWaitTime;                             //average waiting time
+    double accum = 0.0;                             //accumilating for Standard dev
+    double stdDev;                                   //standard deviation of weighted TA
+
+
+    printf("Max finish time = %d. Min Start time = %d. Running Time %d \n", maxFinishTime, minStartTime, sumRunningTime);
+    //utilization =  sum running time / (max finish - min start)
+    //utilization *100
+    utilization= (double)(sumRunningTime/(double)(maxFinishTime-minStartTime)) *100;
+    cout<< utilization <<endl;
+    avgWeightedTurnaround= sumWeightedTurnaround/noProcesses;
+    avgWaitTime = sumWaitTime/noProcesses;
+
+    //Calculating the standard deviation of weighted turnaround
+    accum = 0.0;
+    for (i=0;i<weightedTurnaround.size();i++)
+    {
+        accum += ((weightedTurnaround[i]-avgWeightedTurnaround)*(weightedTurnaround[i]-avgWeightedTurnaround));
+    }
+    stdDev = sqrt(accum/(weightedTurnaround.size()-1));
+
+    // Creating output file: scheduler.perf
+    ofstream myfile ("scheduler.perf");
+    if (myfile.is_open())
+    {
+        myfile << "CPU utilization=" << utilization <<"%.\n";
+        myfile << "Avg WTA=" << avgWeightedTurnaround <<"\n";
+        myfile << "Avg Waiting=" << avgWaitTime <<"\n";
+        myfile << "Std WTA=" << stdDev <<"\n";
+        myfile.close();
+    }
+    else cout << "Unable to open file";
+}
+void outputCurrentStatus ()
+{
+    if (schedulerLog.is_open())
+    {
+       	schedulerLog << "At time "<<getClk()<< " process "<< runningProcess.id;
+       	schedulerLog << " "<<processTable[pBIndex].state;
+       	schedulerLog << " arr " <<processTable[pBIndex].arrivalTime;
+       	schedulerLog << " total " <<processTable[pBIndex].runningTime;
+       	schedulerLog << " remain " <<processTable[pBIndex].remainingTime;
+       	schedulerLog << " wait " <<processTable[pBIndex].waitTime;
+       	if(processTable[pBIndex].state == "FINISHED")
+       	{
+       	double x;
+       	x=((processTable[pBIndex].finishTime)-(processTable[pBIndex].arrivalTime));
+       	schedulerLog << " TA " <<x;
+       	schedulerLog << " WTA " <<x/(processTable[pBIndex].runningTime);
+       	}
+
+       	schedulerLog <<endl;
+
+    }
+    else cout << " Scheduler: unable to open scheduler.log file."<<endl;
+}
+void updateRemainingTime()
+{
+	int slept=getClk()-runningProcessStartTime;
+	runningProcess.remainingTime-=slept;
+    runningProcess.criteria-=slept;
+	processTable[pBIndex].remainingTime = runningProcess.remainingTime;
+	cout << "@clk "<<getClk()<<" : Scheduler: I am awake now, I slept for  "<<slept<<" ticks."<<endl;
+}
+
+int getIndexByID(int id) {
+
+    for(int i=0; i<processTable.size(); i++) {
+        if(processTable[i].id == id) return i;
+    }
+    return -1;
+}
+
